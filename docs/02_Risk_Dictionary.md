@@ -461,3 +461,133 @@ Service Risk directly impacts:
 * Expedite transportation
 * Review fulfillment bottlenecks
 * Escalate operational issues
+
+
+## Profitability Risk
+
+### Business Definition
+
+Profitability Risk refers to the risk that supply chain disruptions, operational inefficiencies, or unfavorable product mix reduce overall order profitability and business performance.
+
+### Business Impact
+
+* Reduced Profit Margins
+* Lower Business Performance
+* Revenue Quality Deterioration
+* Inefficient Resource Allocation
+
+### Stakeholders
+
+Primary Owner:
+
+* Business Operations Manager
+* Supply Chain Manager
+
+Secondary Owner:
+
+* Finance Team
+* Product Manager
+
+### Key Business Questions
+
+1. Are certain products generating consistently low profits?
+
+2. Is profitability deteriorating over time?
+
+3. Are operational issues impacting profit performance?
+
+4. Which products contribute most to profit risk?
+
+### KPI
+
+#### Average Profit Per Order
+
+Definition:
+Average profit generated per customer order.
+
+Formula:
+
+Average Profit Per Order =
+Total Profit / Total Orders
+
+#### Profit Margin
+
+Definition:
+Profit generated relative to sales revenue.
+
+Formula:
+
+Profit Margin =
+Profit / Sales
+
+#### Low Profit Product Ratio
+
+Definition:
+Percentage of products with profit margins below the defined threshold.
+
+Purpose:
+Identify products requiring review.
+
+### Alert Logic
+
+#### Margin Warning
+
+Condition:
+
+Profit Margin < 10%
+
+Severity:
+Medium
+
+Recommended Action:
+Review pricing and operational efficiency.
+
+#### Margin Critical
+
+Condition:
+
+Profit Margin < 5%
+
+Severity:
+High
+
+Recommended Action:
+Escalate for profitability review.
+
+#### Product Profitability Alert
+
+Condition:
+
+Product profit margin remains below threshold for four consecutive weeks.
+
+Severity:
+Medium
+
+Recommended Action:
+Review product strategy and supply chain costs.
+
+### Risk Relationships
+
+Profitability Risk may be influenced by:
+
+* Demand Risk
+* Capacity Risk
+* Inventory Risk
+* Service Risk
+
+Profitability Risk represents the financial outcome of overall supply chain performance.
+
+### Dashboard Components
+
+* Profit Margin Trend
+* Average Profit Per Order
+* Low Profit Product Monitoring
+* Product Profitability Ranking
+
+### Recommended Actions
+
+* Review product portfolio
+* Improve operational efficiency
+* Reduce fulfillment costs
+* Optimize inventory allocation
+* Review pricing strategy
