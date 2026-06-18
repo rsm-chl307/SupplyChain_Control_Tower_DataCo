@@ -81,13 +81,33 @@ Departments were grouped based on product family similarity and demand profile.
 
 The objective is to create a realistic manufacturing network capable of supporting capacity planning, bottleneck identification, and supply chain risk monitoring.
 
-## Capacity Planning Assumption
+# Capacity Planning Design
 
-The DataCo dataset does not contain manufacturing capacity information.
+## Objective
 
-Weekly capacity was estimated using historical demand patterns and a target utilization rate of 85%.
+The original DataCo dataset does not contain manufacturing capacity information.
 
-Capacity = Average Weekly Demand / 0.85
+To support bottleneck monitoring and capacity planning, plant capacity was estimated using historical weekly demand.
 
-This assumption creates realistic capacity constraints and enables bottleneck monitoring within the Control Tower.
+## Methodology
+
+Target Utilization = 85%
+
+Weekly Capacity =
+
+Average Weekly Demand / 0.85
+
+## Business Assumption
+
+Manufacturing plants are expected to operate at approximately 85% utilization under normal conditions.
+
+The remaining capacity acts as a buffer against demand variability and operational disruptions.
+
+## Result
+
+| Plant | Capacity |
+|---------|---------|
+| P1 | 1028 |
+| P2 | 956 |
+| P3 | 805 |
 
