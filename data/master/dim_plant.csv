@@ -1,0 +1,4 @@
+Plant_ID,Plant_Name,Focus_Department,Primary_Risk
+P1,Consumer_Fab,"Apparel,Footwear",Demand Volatility
+P2,Sports_Fab,"Golf,Outdoors,Fitness",Capacity Bottleneck
+P3,Specialty_Fab,"Fan Shop,Technology,Discs Shop,Pet Shop,Book Shop,Health and Beauty",Demand Spike
