@@ -91,11 +91,11 @@ To support bottleneck monitoring and capacity planning, plant capacity was estim
 
 ## Methodology
 
-Target Utilization = 85%
+Target Utilization = 75%
 
 Weekly Capacity =
 
-Average Weekly Demand / 0.85
+Average Weekly Demand / 0.75
 
 ## Business Assumption
 
@@ -107,7 +107,7 @@ The remaining capacity acts as a buffer against demand variability and operation
 
 | Plant | Capacity |
 |---------|---------|
-| P1 | 1028 |
-| P2 | 956 |
-| P3 | 805 |
+| P1 | 1165 |
+| P2 | 1083 |
+| P3 | 913 |
 
