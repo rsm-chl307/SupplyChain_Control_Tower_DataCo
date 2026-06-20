@@ -234,3 +234,47 @@ Action:
 * Review production schedule
 * Reallocate capacity if possible
 * Initiate root cause analysis
+
+# Root Cause Analysis KPIs
+
+## Demand Rank
+
+Business Definition:
+
+Product demand ranking within a plant-week.
+
+Business Purpose:
+
+Identify products consuming the largest share of plant capacity.
+
+---
+
+## Demand Change
+
+Business Definition:
+
+Absolute increase in demand compared with the previous week.
+
+Formula:
+
+Weekly Demand - Previous Week Demand
+
+Business Purpose:
+
+Identify products driving capacity utilization increases.
+
+---
+
+## Demand Contribution
+
+Business Definition:
+
+Percentage contribution to total plant demand.
+
+Formula:
+
+Product Demand / Plant Demand
+
+Business Purpose:
+
+Measure product concentration risk and identify dominant products.
