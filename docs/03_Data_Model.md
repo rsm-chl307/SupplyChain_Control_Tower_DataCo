@@ -111,3 +111,16 @@ The remaining capacity acts as a buffer against demand variability and operation
 | P2 | 1083 |
 | P3 | 913 |
 
+
+## inventory_policy.csv
+
+Purpose:
+Define inventory policies derived from ABC inventory classification.
+
+Columns:
+
+- Product Card Id
+- Product Name
+- ABC_Class
+- Safety_Stock_Days
+- Target_Coverage_Days

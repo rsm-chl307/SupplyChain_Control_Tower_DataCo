@@ -278,3 +278,67 @@ Product Demand / Plant Demand
 Business Purpose:
 
 Measure product concentration risk and identify dominant products.
+
+
+## Inventory Risk KPIs
+
+## Safety Stock Days
+
+Business Definition:
+
+Minimum inventory coverage required to mitigate stockout risk.
+
+Business Purpose:
+
+Define the minimum acceptable inventory level before triggering a critical inventory alert.
+
+Inventory Status Logic:
+
+* DOI < Safety Stock Days → Critical
+
+---
+
+## Target Coverage Days
+
+Business Definition:
+
+Target inventory coverage level maintained under normal operating conditions.
+
+Business Purpose:
+
+Support replenishment planning and inventory optimization.
+
+Inventory Status Logic:
+
+* DOI >= Target Coverage Days → Normal
+* Safety Stock Days <= DOI < Target Coverage Days → Warning
+
+---
+
+## Days of Inventory (DOI)
+
+Business Definition:
+
+Number of days current inventory can support expected demand.
+
+Formula:
+
+DOI = Inventory On Hand / Average Daily Demand
+
+Business Purpose:
+
+Measure inventory health and identify shortage or excess inventory risks.
+
+---
+
+## Inventory Status
+
+Business Definition:
+
+Inventory risk classification based on DOI thresholds.
+
+Logic:
+
+* DOI < Safety Stock Days → Critical
+* Safety Stock Days <= DOI < Target Coverage Days → Warning
+* DOI >= Target Coverage Days → Normal
