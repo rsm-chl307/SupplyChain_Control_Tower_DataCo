@@ -27,7 +27,7 @@ Stage 1 — Planning Data Design: COMPLETE.
 
 Stage 2 — Planning Data Pipeline: COMPLETE.
 
-Stage 3 — Scenario Generator: NOT STARTED.
+Stage 3 — Scenario Generator: COMPLETE.
 
 Stage 4 — Decision / Allocation Engine: NOT STARTED.
 
@@ -39,7 +39,7 @@ At the time of the Stage 0 entry, Scenario Planning implementation had not yet b
 
 ### Next Step
 
-Stage 1 and Stage 2 are complete. The next stage is Stage 3 — Scenario Generator; do not begin allocation or performance evaluation until explicitly authorized.
+Stages 1–3 are complete. The next stage is Stage 4 — Decision / Allocation Engine; do not begin performance evaluation until explicitly authorized.
 
 
 ## Stage 2 — Planning Data Pipeline
@@ -71,3 +71,30 @@ No scenario logic, allocation, performance evaluation, or Stage 3 work was start
 ### Next Step
 
 Stage 3 — Scenario Generator.
+
+
+## Stage 3 — Scenario Generator
+
+### Objective
+
+Create deterministic scenario-specific planning inputs from the approved Stage 2 horizon snapshot without changing the baseline snapshot or implementing allocation.
+
+### Decisions and Implementation
+
+The MVP implements `Baseline`, `Demand_Surge_10pct`, and `Capacity_Disruption_P1_20pct`. Demand Surge requires an explicit percentage; Capacity Disruption requires explicit percentage and plant IDs, with optional inclusive week bounds. Scenario IDs encode parameters. Priority Shift remains a future extension. The generator preserves sparse observations, uses `Weekly_Capacity` as scenario capacity, retains `Baseline_Available_Capacity` as context, and adds only the three approved scenario fields.
+
+### Files and Artifact
+
+- `src/scenario_generator.py`
+- `tests/test_scenario_generator.py`
+- `data/processed/scenario_snapshot.csv`
+- Example input: `data/processed/planning_snapshot_20170101_20171231.csv`
+- Output: 5,931 rows, 1,977 per scenario
+
+### Validation and Integrity
+
+Nineteen focused tests passed, including parameter failures, scenario calculations, schema, sparsity, scenario-key uniqueness, input immutability, and deterministic repeated execution. The generated artifact has the exact approved 14-column schema. Stage 1 and Stage 2 source code and artifacts remained unchanged. No allocation or performance logic was started.
+
+### Next Step
+
+Stage 4 — Decision / Allocation Engine.

@@ -908,7 +908,7 @@ The purpose is to confirm business behavior rather than maximize automated test 
 Stage 0  Project Definition                 COMPLETE
 Stage 1  Planning Data Design               COMPLETE
 Stage 2  Planning Data Pipeline             COMPLETE
-Stage 3  Scenario Generator                 NOT STARTED
+Stage 3  Scenario Generator                 COMPLETE
 Stage 4  Decision / Allocation Engine       NOT STARTED
 Stage 5  Performance Evaluation             NOT STARTED
 
@@ -919,11 +919,11 @@ Future   AI-Assisted Planning               FUTURE
 
 # 30. Immediate Task
 
-Stage 2 Planning Data Pipeline is complete.
+Stage 3 Scenario Generator is complete.
 
-The next implementation stage is Stage 3 – Scenario Generator.
+The next implementation stage is Stage 4 – Decision / Allocation Engine.
 
-Do not proceed to Stage 4 unless explicitly instructed.
+Do not proceed to Stage 5 unless explicitly instructed.
 
 ---
 

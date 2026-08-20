@@ -41,3 +41,12 @@ The two-week MVP excludes OR solvers, advanced forecasting, real-time or ERP int
 Stage 2 separates repeatable source loading and horizon selection from the Stage 1 in-memory snapshot contract. `src/planning_pipeline.py` loads the five approved source datasets, composes `build_planning_snapshot(...)` from `src/planning_snapshot.py`, validates the full baseline, applies inclusive `planning_start_week` and `planning_end_week` parameters, validates again, sorts deterministically, and writes a horizon-specific artifact.
 
 Strict horizon validation fails for missing or invalid parameters, reversed dates, dates outside the available source range, and empty selected ranges. Sparse observations remain warnings only. Outputs use `planning_snapshot_{start}_{end}.csv`, preserving the full-range `planning_snapshot.csv` baseline. Seven unittest methods cover valid, invalid, boundary, reuse, determinism, schema, sparse-data, and baseline-protection behavior. Scenario logic, allocation, performance evaluation, and Stage 3 functionality were intentionally excluded.
+
+
+## Stage 3 Implementation Record
+
+Stage 3 adds a separate, in-memory Scenario Generator on top of the completed Stage 2 horizon-specific Planning Snapshot. `src/scenario_generator.py` validates the exact Stage 2 baseline schema, requires explicit scenario parameters, and reuses the baseline fields without reloading source datasets.
+
+The MVP supports Baseline, parameterized Demand Surge, and parameterized Capacity Disruption. It preserves the sparse Plant × Product × Week row set and adds only `Scenario`, `Scenario_Demand`, and `Scenario_Capacity`. Scenario IDs encode the major parameters, output ordering is deterministic, and the input DataFrame is never mutated. The generator has no CSV I/O; the example artifact is written by an external run step.
+
+Validation fails loudly for invalid schemas, dates, values, duplicate keys, unsupported Priority Shift, missing parameters, invalid percentages, unknown plants, and out-of-range disruption weeks. Nineteen focused tests cover calculations, boundaries, schema, sparsity, immutability, uniqueness, and reproducibility. Stage 3 intentionally excludes allocation, backlog/KPI/performance logic, optimization, forecasting, AI, and dashboard changes.
