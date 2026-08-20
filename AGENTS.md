@@ -76,6 +76,40 @@ unless explicitly requested.
 
 ---
 
+## Approval / Permission Policy
+
+Operate autonomously within the currently approved stage.
+
+Do not repeatedly ask for approval for routine, non-destructive actions that
+are clearly required by the current task, including:
+
+* Reading repository files
+* Inspecting Git status or diffs
+* Running tests and validation
+* Running Python scripts or syntax checks
+* Creating or modifying files within the approved stage
+* Generating approved outputs
+* Removing generated Python cache files such as `__pycache__` and `.pyc`
+* Updating documentation required to record completed work
+
+Ask for explicit approval only when the action:
+
+* Changes a frozen business rule
+* Changes the approved architecture
+* Expands beyond the current stage
+* Modifies or deletes important completed-stage artifacts
+* Requires a new dependency or environment-level change
+* Performs destructive filesystem operations
+* Performs Git commit, push, reset, clean, or history-changing operations
+* Requires a new business decision
+
+When approval is required, briefly explain what decision is needed and why.
+
+Otherwise, proceed with the implementation without interrupting the user
+for routine permission requests.
+
+---
+
 ## Architecture Changes
 
 If you discover that the existing architecture is insufficient:
@@ -108,6 +142,9 @@ Do not silently change:
 
 These are approved business decisions.
 
+If a business rule is ambiguous or not yet defined, identify the issue and
+ask for approval before changing it.
+
 ---
 
 ## Current Frozen Allocation Logic
@@ -120,9 +157,9 @@ max(Scenario Demand - Beginning Inventory, 0)
 Priority:
 
 ```text
-Priority DESC
+Planning_Priority DESC
 Net Demand DESC
-Product_ID ASC
+Product Card Id ASC
 ```
 
 Allocation:
@@ -260,9 +297,21 @@ but do not implement it.
 
 ## Documentation
 
-When a stage is completed, update project documentation only if requested.
+When a stage is completed, update the relevant project documentation to
+keep development records synchronized.
 
-Do not create unnecessary documentation files during coding.
+At minimum, review:
+
+* Stage design proposal
+* developer notes
+* project journal
+* ai_agent_implementation_spec.md
+
+Update documentation only for the work completed in the current stage.
+
+Do not create unnecessary documentation files.
+
+Preserve historical development decisions where appropriate.
 
 ---
 
@@ -280,6 +329,22 @@ Do not describe it as:
 * Enterprise optimization platform
 
 unless the project is actually expanded to support those capabilities.
+
+---
+
+## Future UI
+
+The final project may expose scenario parameters through a user-facing UI.
+
+Users should eventually be able to adjust scenario parameters without
+modifying Python source code.
+
+However:
+
+* Do not implement UI functionality unless explicitly requested.
+* Keep scenario business logic in the backend.
+* The UI should pass parameters to the Scenario Generator rather than
+  duplicate scenario calculations.
 
 ---
 
