@@ -34,3 +34,10 @@ The initial allocation direction is deterministic and rule-based: calculate `Net
 Core modules should use Python, Pandas, and NumPy with type hints, clear interfaces, and no unnecessary frameworks. Engines must remain independent of CSV I/O; a pipeline or notebook may orchestrate reads and writes. Existing field names and source provenance should be preserved or explicitly mapped. Stage 1 must resolve whether planning capacity means total `Weekly_Capacity` or derived `Available_Capacity`, and whether absent product-week observations remain absent or become explicit zero-demand rows.
 
 The two-week MVP excludes OR solvers, advanced forecasting, real-time or ERP integration, production deployment, and AI/RAG functionality. The modular boundary leaves room for future optimization or AI explanation layers to consume validated deterministic outputs without replacing the core planning rules.
+
+
+## Stage 2 Implementation Record
+
+Stage 2 separates repeatable source loading and horizon selection from the Stage 1 in-memory snapshot contract. `src/planning_pipeline.py` loads the five approved source datasets, composes `build_planning_snapshot(...)` from `src/planning_snapshot.py`, validates the full baseline, applies inclusive `planning_start_week` and `planning_end_week` parameters, validates again, sorts deterministically, and writes a horizon-specific artifact.
+
+Strict horizon validation fails for missing or invalid parameters, reversed dates, dates outside the available source range, and empty selected ranges. Sparse observations remain warnings only. Outputs use `planning_snapshot_{start}_{end}.csv`, preserving the full-range `planning_snapshot.csv` baseline. Seven unittest methods cover valid, invalid, boundary, reuse, determinism, schema, sparse-data, and baseline-protection behavior. Scenario logic, allocation, performance evaluation, and Stage 3 functionality were intentionally excluded.

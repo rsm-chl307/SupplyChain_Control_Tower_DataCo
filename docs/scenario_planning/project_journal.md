@@ -23,9 +23,9 @@ Inventory and capacity inputs are derived or simulated Control Tower datasets ra
 
 Stage 0 — Project Definition: COMPLETE.
 
-Stage 1 — Planning Data Design: NOT STARTED.
+Stage 1 — Planning Data Design: COMPLETE.
 
-Stage 2 — Planning Data Pipeline: NOT STARTED.
+Stage 2 — Planning Data Pipeline: COMPLETE.
 
 Stage 3 — Scenario Generator: NOT STARTED.
 
@@ -35,8 +35,39 @@ Stage 5 — Performance Evaluation: NOT STARTED.
 
 AI-Assisted Planning: FUTURE.
 
-Scenario Planning implementation has not yet begun.
+At the time of the Stage 0 entry, Scenario Planning implementation had not yet begun.
 
 ### Next Step
 
-Stage 1 — Planning Data Design: define and validate the canonical Planning Snapshot contract and its source-field mappings. Do not begin scenario generation or allocation until that contract is agreed.
+Stage 1 and Stage 2 are complete. The next stage is Stage 3 — Scenario Generator; do not begin allocation or performance evaluation until explicitly authorized.
+
+
+## Stage 2 — Planning Data Pipeline
+
+### Objective
+
+Convert the approved Stage 1 snapshot preparation into a reproducible, parameterized pipeline without changing the Stage 1 contract.
+
+### Completion Record
+
+Stage 2 is complete. The pipeline loads approved sources, reuses `src/planning_snapshot.py`, validates the full baseline, applies strict inclusive horizon parameters, validates the filtered result, sorts deterministically, and writes a horizon-specific artifact.
+
+### Files and Output
+
+- `src/planning_pipeline.py`
+- `tests/test_planning_pipeline.py`
+- `data/processed/planning_snapshot_20170101_20171231.csv`
+- Example horizon: `2017-01-01` through `2017-12-31`
+- Output rows: 1,977
+
+### Validation and Integrity
+
+Seven unittest methods passed, including grouped parameter cases for missing, invalid, reversed, out-of-range, and empty horizons. Source hashes and the full-range Stage 1 baseline artifact remained unchanged. Sparse observations were preserved.
+
+Out-of-range horizons fail explicitly because silently clipping a requested horizon would make the requested parameters inconsistent with the actual analysis period.
+
+No scenario logic, allocation, performance evaluation, or Stage 3 work was started.
+
+### Next Step
+
+Stage 3 — Scenario Generator.
