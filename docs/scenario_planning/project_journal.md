@@ -29,9 +29,9 @@ Stage 2 — Planning Data Pipeline: COMPLETE.
 
 Stage 3 — Scenario Generator: COMPLETE.
 
-Stage 4 — Decision / Allocation Engine: NOT STARTED.
+Stage 4 — Decision / Allocation Engine: COMPLETE.
 
-Stage 5 — Performance Evaluation: NOT STARTED.
+Stage 5 — Performance Evaluation: COMPLETE.
 
 AI-Assisted Planning: FUTURE.
 
@@ -39,7 +39,7 @@ At the time of the Stage 0 entry, Scenario Planning implementation had not yet b
 
 ### Next Step
 
-Stages 1–3 are complete. The next stage is Stage 4 — Decision / Allocation Engine; do not begin performance evaluation until explicitly authorized.
+Stages 1–5 are complete. Future work is limited to separately approved decision-support extensions.
 
 
 ## Stage 2 — Planning Data Pipeline
@@ -98,3 +98,63 @@ Nineteen focused tests passed, including parameter failures, scenario calculatio
 ### Next Step
 
 Stage 4 — Decision / Allocation Engine.
+
+
+## Stage 4 — Decision / Allocation Engine
+
+### Objective
+
+Allocate scenario production capacity deterministically across eligible products and calculate same-week backlog for the Stage 3 Scenario Snapshot.
+
+### Frozen decisions
+
+Allocation is independent by week at Scenario × Plant × Week. Beginning Inventory covers only its product’s same-week demand. The existing Plant × Product rows are the complete eligibility set; cross-plant transfers and backlog carryover are excluded. Products are ordered by Planning_Priority descending, Net_Demand descending, and Product Card Id ascending. Scenario_Capacity is the shared capacity pool.
+
+### Implementation and artifact
+
+- `src/allocation_engine.py`
+- `src/allocation_manager.py`
+- `src/allocation_validator.py`
+- `tests/test_allocation_engine.py`
+- `data/processed/allocation_result.csv`
+
+The real Stage 3 input contained 5,931 rows and produced 5,931 allocation rows. The output retained the sparse input row set and the approved allocation fields.
+
+### Validation and integrity
+
+Eighteen focused tests passed. Full result validation passed, including capacity reconciliation, arithmetic rules, priority ordering, eligibility, deterministic repeatability, and input immutability. Stage 1, Stage 2, and Stage 3 code and artifacts remained unchanged.
+
+No KPI, service-level, utilization, risk, recommendation, optimization, forecasting, AI, dashboard, or Stage 5 functionality was implemented.
+
+### Next step
+
+Stage 5 — Performance Evaluation.
+
+
+## Stage 5 — Performance Evaluation
+
+### Objective
+
+Evaluate the operational impact of Stage 4 allocation results without changing allocation decisions.
+
+### Frozen decisions
+
+Service Level uses Allocated_Qty divided by Net_Demand, Allocation Rate uses Allocated_Qty divided by Scenario_Demand, and Capacity Utilization uses ratio-of-sums allocation divided by deduplicated Scenario_Capacity pools. Zero denominators use the approved deterministic policies. Backlog is read from Stage 4 and is not carried across weeks.
+
+KPI rows are produced at Scenario, Scenario × Plant, and Scenario × Week levels. Baseline is the comparison reference. Healthy, Watch, and At Risk statuses use only backlog and 100% utilization; no additional thresholds or composite score are used.
+
+### Implementation and artifact
+
+- `src/kpi_engine.py`
+- `src/performance_evaluator.py`
+- `src/performance_manager.py`
+- `tests/test_performance_evaluation.py`
+- `data/processed/performance_result.csv`
+
+The real Stage 4 input produced 171 performance rows. All current rows are Healthy because the approved horizon has zero backlog and utilization below 100%.
+
+### Validation and integrity
+
+Sixteen focused tests and the full 60-test repository suite passed. Synthetic cases covered partial allocation, backlog, zero demand, zero capacity, and inventory coverage. The Stage 4 allocation artifact and all earlier artifacts remained unchanged.
+
+No UI, dashboard, AI, recommendation, optimization, or later-stage functionality was implemented.

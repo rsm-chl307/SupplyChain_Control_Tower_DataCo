@@ -909,8 +909,8 @@ Stage 0  Project Definition                 COMPLETE
 Stage 1  Planning Data Design               COMPLETE
 Stage 2  Planning Data Pipeline             COMPLETE
 Stage 3  Scenario Generator                 COMPLETE
-Stage 4  Decision / Allocation Engine       NOT STARTED
-Stage 5  Performance Evaluation             NOT STARTED
+Stage 4  Decision / Allocation Engine       COMPLETE
+Stage 5  Performance Evaluation             COMPLETE
 
 Future   AI-Assisted Planning               FUTURE
 ```
@@ -919,11 +919,11 @@ Future   AI-Assisted Planning               FUTURE
 
 # 30. Immediate Task
 
-Stage 3 Scenario Generator is complete.
+Stage 5 Performance Evaluation is complete.
 
-The next implementation stage is Stage 4 – Decision / Allocation Engine.
+Stages 0–5 are complete. Future decision-support extensions require explicit instruction.
 
-Do not proceed to Stage 5 unless explicitly instructed.
+Do not implement AI-Assisted Planning, UI, or additional stages unless explicitly instructed.
 
 ---
 

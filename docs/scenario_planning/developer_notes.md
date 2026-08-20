@@ -50,3 +50,19 @@ Stage 3 adds a separate, in-memory Scenario Generator on top of the completed St
 The MVP supports Baseline, parameterized Demand Surge, and parameterized Capacity Disruption. It preserves the sparse Plant × Product × Week row set and adds only `Scenario`, `Scenario_Demand`, and `Scenario_Capacity`. Scenario IDs encode the major parameters, output ordering is deterministic, and the input DataFrame is never mutated. The generator has no CSV I/O; the example artifact is written by an external run step.
 
 Validation fails loudly for invalid schemas, dates, values, duplicate keys, unsupported Priority Shift, missing parameters, invalid percentages, unknown plants, and out-of-range disruption weeks. Nineteen focused tests cover calculations, boundaries, schema, sparsity, immutability, uniqueness, and reproducibility. Stage 3 intentionally excludes allocation, backlog/KPI/performance logic, optimization, forecasting, AI, and dashboard changes.
+
+
+## Stage 4 Implementation Record
+
+Stage 4 adds a lean in-memory allocation layer over the Stage 3 Scenario Snapshot. `allocation_engine.py` processes one Scenario × Plant × Week group, `allocation_manager.py` orchestrates all groups, and `allocation_validator.py` enforces input and output business rules. No module reads or writes CSV files.
+
+The frozen rules are weekly independent allocation, product/plant eligibility from the existing Scenario Snapshot, no cross-plant transfers, product-specific same-week inventory coverage, shared `Scenario_Capacity`, and deterministic ordering by Planning Priority descending, Net Demand descending, and Product Card Id ascending. The result adds Net_Demand, Allocated_Qty, Backlog, Remaining_Capacity, Allocation_Order, Allocation_Strategy, and Allocation_Reason.
+
+Eighteen focused tests passed. The real Stage 3 artifact produced `data/processed/allocation_result.csv` with 5,931 rows. Stage 4 does not calculate KPIs, service level, utilization, risk, recommendations, forecasting, optimization, AI, or dashboard changes.
+
+
+## Stage 5 Implementation Record
+
+Stage 5 evaluates the immutable Stage 4 allocation result through three separated in-memory modules: `kpi_engine.py` calculates numerical KPIs, `performance_evaluator.py` applies the approved status rules, and `performance_manager.py` orchestrates aggregation and Baseline comparison. Capacity is deduplicated at Scenario × Plant × Week before ratio-of-sums utilization is calculated.
+
+The consolidated `data/processed/performance_result.csv` contains Scenario, Scenario × Plant, and observed Scenario × Week KPI rows plus status and scenario-comparison fields. Backlog is read from Stage 4, never recalculated or carried across weeks. Sixteen synthetic-focused tests and the full repository suite passed. Stage 5 does not modify allocation, add product KPI artifacts, create composite scores, or implement UI, dashboards, AI, or recommendations.
