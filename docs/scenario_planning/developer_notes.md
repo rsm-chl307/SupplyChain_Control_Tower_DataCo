@@ -66,3 +66,10 @@ Eighteen focused tests passed. The real Stage 3 artifact produced `data/processe
 Stage 5 evaluates the immutable Stage 4 allocation result through three separated in-memory modules: `kpi_engine.py` calculates numerical KPIs, `performance_evaluator.py` applies the approved status rules, and `performance_manager.py` orchestrates aggregation and Baseline comparison. Capacity is deduplicated at Scenario × Plant × Week before ratio-of-sums utilization is calculated.
 
 The consolidated `data/processed/performance_result.csv` contains Scenario, Scenario × Plant, and observed Scenario × Week KPI rows plus status and scenario-comparison fields. Backlog is read from Stage 4, never recalculated or carried across weeks. Sixteen synthetic-focused tests and the full repository suite passed. Stage 5 does not modify allocation, add product KPI artifacts, create composite scores, or implement UI, dashboards, AI, or recommendations.
+
+
+## End-to-End Runner Implementation Record
+
+`src/run_planning.py` provides the single `run_planning(...)` orchestration entry point for the completed Stage 2–5 backend. It calls `run_planning_pipeline`, `generate_scenarios`, `run_allocation`, and `evaluate_allocation` in sequence; all business logic remains in those existing modules.
+
+The runner requires a planning start/end week and disruption plant, with approved example defaults of 10% demand surge and 20% capacity reduction. It writes horizon-specific outputs beneath `data/processed/scenario_runs/{start}_{end}/` by default, protecting historical artifacts. It validates arguments, preserves deterministic schemas/order, and supports reproducible reruns.

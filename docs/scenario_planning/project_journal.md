@@ -158,3 +158,20 @@ The real Stage 4 input produced 171 performance rows. All current rows are Healt
 Sixteen focused tests and the full 60-test repository suite passed. Synthetic cases covered partial allocation, backlog, zero demand, zero capacity, and inventory coverage. The Stage 4 allocation artifact and all earlier artifacts remained unchanged.
 
 No UI, dashboard, AI, recommendation, optimization, or later-stage functionality was implemented.
+
+
+## Dashboard Integration — End-to-End Runner
+
+### Objective
+
+Provide one reproducible command-level entry point for Stages 2–5 before Power BI integration.
+
+### Implementation
+
+`src/run_planning.py` now composes the existing planning pipeline, scenario generator, allocation manager, and performance manager. It accepts planning horizon bounds, demand surge percentage, capacity disruption percentage, disruption plant, and an optional run output directory. Invalid inputs fail before execution.
+
+The default output convention is `data/processed/scenario_runs/{start}_{end}/`, containing the horizon snapshot plus `scenario_snapshot.csv`, `allocation_result.csv`, and `performance_result.csv`. This protects the approved root artifacts.
+
+Focused runner tests cover valid execution, invalid/reversed horizons, parameter validation, missing/unknown plants, propagation, expected outputs, deterministic reruns, and completed-artifact protection. The full repository suite remains passing.
+
+No Power BI, UI, backend business-rule, or dashboard-page implementation was started. The next step is validating the documented Power BI mapping and then implementing the approved dashboard pages.
