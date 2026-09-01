@@ -175,3 +175,7 @@ The default output convention is `data/processed/scenario_runs/{start}_{end}/`, 
 Focused runner tests cover valid execution, invalid/reversed horizons, parameter validation, missing/unknown plants, propagation, expected outputs, deterministic reruns, and completed-artifact protection. The full repository suite remains passing.
 
 No Power BI, UI, backend business-rule, or dashboard-page implementation was started. The next step is validating the documented Power BI mapping and then implementing the approved dashboard pages.
+
+## Dashboard Integration MVP
+
+Implemented a separate Streamlit Scenario Planning experience at `dashboard/scenario_planning_app.py` while preserving the completed PBIX Control Tower. The app delegates execution to `src/run_planning.py`, loads prepared Stage 5/4/3 outputs, and provides scenario overview, baseline comparison, and allocation drill-down views. Focused dashboard integration tests pass; no backend business rules, historical artifacts, PBIX pages, or existing Control Tower notebooks were changed.

@@ -73,3 +73,7 @@ The consolidated `data/processed/performance_result.csv` contains Scenario, Scen
 `src/run_planning.py` provides the single `run_planning(...)` orchestration entry point for the completed Stage 2–5 backend. It calls `run_planning_pipeline`, `generate_scenarios`, `run_allocation`, and `evaluate_allocation` in sequence; all business logic remains in those existing modules.
 
 The runner requires a planning start/end week and disruption plant, with approved example defaults of 10% demand surge and 20% capacity reduction. It writes horizon-specific outputs beneath `data/processed/scenario_runs/{start}_{end}/` by default, protecting historical artifacts. It validates arguments, preserves deterministic schemas/order, and supports reproducible reruns.
+
+## Dashboard Integration MVP
+
+A separate Streamlit presentation layer is implemented at `dashboard/scenario_planning_app.py`. It preserves the existing Power BI Control Tower and consumes the runner outputs (`performance_result.csv`, `allocation_result.csv`, and `scenario_snapshot.csv`) without duplicating scenario, allocation, or KPI logic. The app exposes planning horizon, demand surge, capacity disruption, and disruption plant controls, invokes `src/run_planning.py`, and provides Scenario Overview, Scenario Comparison, and Capacity Allocation Detail views.

@@ -376,3 +376,7 @@ Required inputs are `data_root`, `planning_start_week`, `planning_end_week`, and
 Each run writes a horizon snapshot, `scenario_snapshot.csv`, `allocation_result.csv`, and `performance_result.csv` in that run-specific directory. Invalid horizons, percentages, or plant arguments fail loudly. Repeated execution with identical inputs produces identical files.
 
 The runner does not implement UI or Power BI behavior. Future dashboard controls should pass validated parameters to this runner rather than reproduce scenario, allocation, or KPI calculations.
+
+## Dashboard Integration MVP Implementation Record
+
+The approved MVP presentation layer is implemented as `dashboard/scenario_planning_app.py` using Streamlit and Plotly. It adds Scenario Overview, Scenario Comparison, and Capacity Allocation Detail views without modifying the existing `dashboard/supply_chain_control_tower.pbix`. User controls pass planning horizon and approved scenario parameters to `src/run_planning.py`; prepared performance, allocation, and scenario outputs are loaded for display.
