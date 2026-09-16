@@ -4,7 +4,15 @@ from pathlib import Path
 
 import pandas as pd
 
-from dashboard.scenario_planning_app import load_dashboard_outputs, scenario_comparison, scenario_kpis
+from dashboard.scenario_planning_app import (
+    allocation_plant_summary,
+    comparison_display_table,
+    format_percentage_points,
+    load_dashboard_outputs,
+    scenario_comparison,
+    scenario_insights,
+    scenario_kpis,
+)
 
 
 ROOT = Path(__file__).parents[1]
@@ -33,6 +41,24 @@ class DashboardIntegrationTests(unittest.TestCase):
         self.assertIn("Backlog_Change", result.columns)
         baseline = result[result["Scenario"] == "Baseline"].iloc[0]
         self.assertEqual(float(baseline["Service_Level_Change"]), 0.0)
+
+    def test_change_formatting_uses_percentage_points(self):
+        self.assertEqual(format_percentage_points(0.0023), "+0.23 percentage points")
+        display = comparison_display_table(self.performance)
+        self.assertIn("percentage points", display["Service_Level_Change"].iloc[0])
+
+    def test_insights_are_deterministic_and_use_stage5_values(self):
+        first = scenario_insights(self.performance)
+        second = scenario_insights(self.performance)
+        self.assertEqual(first, second)
+        self.assertTrue(any("capacity pressure" in value for value in first))
+        self.assertTrue(any("No alternative scenario creates backlog" in value for value in first))
+
+    def test_allocation_plant_summary_uses_prepared_plant_kpis(self):
+        outputs = load_dashboard_outputs(self.output_dir)
+        summary = allocation_plant_summary(outputs["allocation"], outputs["performance"])
+        self.assertEqual(len(summary), 9)
+        self.assertTrue({"Total_Scenario_Capacity", "Remaining_Capacity", "Performance_Status"}.issubset(summary.columns))
 
     def test_missing_output_is_reported(self):
         with tempfile.TemporaryDirectory() as directory:
