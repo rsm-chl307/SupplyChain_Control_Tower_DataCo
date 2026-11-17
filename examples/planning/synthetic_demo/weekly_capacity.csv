@@ -1,0 +1,4 @@
+Plant_ID,Capacity,Capacity_Version,Provenance_Type,Factor_Version,Workload_Unit,Week
+P1,4.0,fixture,SYNTHETIC_TEST,fixture,EqWU,2017-01-08
+P1,4.0,fixture,SYNTHETIC_TEST,fixture,EqWU,2017-01-15
+P1,4.0,fixture,SYNTHETIC_TEST,fixture,EqWU,2017-01-22

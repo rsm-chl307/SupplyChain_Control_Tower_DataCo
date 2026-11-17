@@ -1,10 +1,28 @@
 # Supply Chain Control Tower Dashboard
 
+> **Current scope (2026-11-17):** The owner subsequently authorized a reduced three-day sequential planning upgrade. The [active implementation record](docs/scenario_planning/developer_notes.md) and [implemented sequential_v1 contract](docs/improvement_program/04_data_contracts.md) describe it. The original [six-WP Route B plan](docs/improvement_program/README.md) remains historical planning direction, not authorization to implement all WPs. Existing monitoring artifacts remain unchanged.
+
 An end-to-end supply chain analytics project that integrates demand, inventory, capacity utilization, and service-risk signals into an interactive Power BI control tower.
 
 The dashboard is designed to help supply chain managers identify operational risks, trace their potential drivers, and prioritize products and plants that require attention.
 
 ---
+
+## Source-independent sequential planning
+
+Two primary modes, SYNTHETIC_DEMO and USER_DATA, feed the same workload allocation, inventory/backlog, scenario, validation and KPI engine. DataCo and its monitoring artifacts are optional references.
+
+    python -B -m src.run_planning --sequential-config examples/planning/synthetic_demo/config.json --output-dir tmp/planning_source_runs
+    python -B -m src.run_planning --sequential-config examples/planning/user_data/config.json --validate-inputs
+    python -B -m src.run_planning --sequential-config examples/planning/user_data/config.json --output-dir tmp/planning_source_runs
+
+[CSV contracts and import instructions](docs/planning_csv_inputs.md) · [Runnable examples](examples/planning/README.md) · [CSV templates](examples/planning/templates)
+
+The synthetic demo reproduces the existing fixture without DataCo files. The user example has custom field names and string IDs, including 001. Optional missing inputs require explicit labeled assumptions; unknown demand never becomes zero.
+
+The existing Streamlit app starts in sequential mode and accepts a CSV configuration path. Upload/mapping wizards are deferred. Choose a published run to inspect its prepared metrics and input diagnostics.
+
+The optional DataCo configuration now uses the owner-approved COMPLETE/CLOSED/PROCESSING whitelist, excludes canceled/fraud and other statuses by default, and uses separate synthetic opening stock rather than replaying historical replenishment. These rules belong to that reference configuration, not the common engine.
 
 ## Project Overview
 

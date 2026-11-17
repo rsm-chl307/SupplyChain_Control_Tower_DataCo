@@ -1,5 +1,9 @@
 # Supply Chain Scenario Planning Prototype
 
+> **Current data strategy:** [CSV input contracts](docs/planning_csv_inputs.md) support SYNTHETIC_DEMO and USER_DATA through one engine. DataCo/ABC/raw directory paths belong to optional legacy/reference adapters and must not become mandatory requirements for user data.
+
+> **Scope notice — 2026-11-17:** This specification records the legacy implementation and its frozen rules. The [Route B improvement program](docs/improvement_program/README.md) records separately approved improvement direction, pending rules and a proposed stage plan. The original six-WP program is not authorized as a whole. A later owner instruction authorized the reduced sequential upgrade recorded in [developer notes](docs/scenario_planning/developer_notes.md); its implemented schema is sequential_v1. Do not silently apply workload/sequential semantics to legacy contracts; consult the program conflict register and obtain stage-specific authorization.
+
 ## Codex Implementation Specification
 
 ## 1. Project Context

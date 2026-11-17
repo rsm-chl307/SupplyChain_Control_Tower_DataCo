@@ -18,6 +18,7 @@ from dashboard.scenario_planning_app import (
 ROOT = Path(__file__).parents[1]
 
 
+@unittest.skipUnless(all((ROOT / "data/processed" / name).is_file() for name in ["performance_result.csv", "allocation_result.csv", "scenario_snapshot.csv"]), "optional legacy reference dashboard artifacts unavailable")
 class DashboardIntegrationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

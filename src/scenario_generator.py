@@ -253,3 +253,79 @@ def generate_scenarios(
     _validate_output(output, baseline, parameters)
     return output
 
+
+
+def generate_sequential_scenarios(
+    demand: pd.DataFrame,
+    capacity_pools: pd.DataFrame,
+    definitions: list[dict[str, object]],
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Compose explicit qualified-demand/capacity shocks for the new path.
+
+    Historical Gross/Qualified/Excluded remain immutable. Multipliers, affected
+    pools and shortage policy have no implicit business defaults.
+    """
+    from src.planning_inputs import WEEK_KEY, numeric, require_frame, weekly_dates
+
+    source = weekly_dates(demand)
+    pools = weekly_dates(capacity_pools)
+    require_frame(source, WEEK_KEY + ["Gross_Demand", "Qualified_Demand", "Excluded_Demand", "Coverage_Status"], WEEK_KEY, "scenario demand")
+    require_frame(pools, ["Plant_ID", "Order_Date", "Baseline_Workload_Capacity"], ["Plant_ID", "Order_Date"], "scenario pools")
+    numeric(source, ["Gross_Demand", "Qualified_Demand", "Excluded_Demand"])
+    numeric(pools, ["Baseline_Workload_Capacity"])
+    if source.empty or pools.empty or not definitions:
+        raise ValueError("nonempty scenario inputs and explicit definitions required")
+    if not ((source.Gross_Demand - source.Qualified_Demand - source.Excluded_Demand).abs() <= 1e-9).all():
+        raise ValueError("historical gross/qualified/excluded reconciliation failed")
+    names, demand_outputs, pool_outputs = set(), [], []
+    required = {"Scenario", "Demand_Multiplier", "Capacity_Multiplier", "Disruption_Plants", "Disruption_Weeks", "Backlog_Policy"}
+    for definition in definitions:
+        if not required.issubset(definition):
+            raise ValueError(f"scenario requires explicit fields: {sorted(required - set(definition))}")
+        name = definition["Scenario"]
+        if not isinstance(name, str) or not name.strip() or name in names:
+            raise ValueError("scenario names must be nonempty and unique")
+        names.add(name)
+        dm, cm = definition["Demand_Multiplier"], definition["Capacity_Multiplier"]
+        for value in (dm, cm):
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                raise ValueError("scenario multipliers must be finite numbers")
+        if dm < 0 or not 0 <= cm <= 1:
+            raise ValueError("invalid scenario multipliers")
+        if definition["Backlog_Policy"] not in {"LOST_SALES", "CARRY_FORWARD"}:
+            raise ValueError("scenario requires an explicit shortage policy")
+        plants = definition["Disruption_Plants"]
+        if not isinstance(plants, list) or len(set(plants)) != len(plants) or set(plants) - set(pools.Plant_ID):
+            raise ValueError("invalid disruption plants")
+        if cm != 1 and not plants:
+            raise ValueError("capacity disruption needs explicit affected plants")
+        selected_weeks = definition["Disruption_Weeks"]
+        if selected_weeks is not None:
+            if not isinstance(selected_weeks, list):
+                raise ValueError("Disruption_Weeks must be an explicit list or null for full horizon")
+            dates = weekly_dates(pd.DataFrame({"Order_Date": selected_weeks}))["Order_Date"]
+            if set(dates) - set(pools.Order_Date):
+                raise ValueError("disruption weeks outside capacity horizon")
+        if name == "Baseline" and (dm != 1 or cm != 1):
+            raise ValueError("Baseline must preserve demand and workload capacity")
+        out = source.copy(deep=True)
+        out["Scenario"] = name
+        out["Backlog_Policy"] = definition["Backlog_Policy"]
+        out["Scenario_Qualified_Demand"] = out.Qualified_Demand * dm
+        out["Incremental_Demand"] = out.Scenario_Qualified_Demand - out.Qualified_Demand
+        numeric(out, ["Scenario_Qualified_Demand"])
+        cap = pools.copy(deep=True)
+        cap["Scenario"] = name
+        cap["Available_Workload_Capacity"] = cap.Baseline_Workload_Capacity.astype(float)
+        mask = cap.Plant_ID.isin(plants)
+        if selected_weeks is not None:
+            mask &= cap.Order_Date.isin(dates)
+        cap.loc[mask, "Available_Workload_Capacity"] *= cm
+        demand_outputs.append(out)
+        pool_outputs.append(cap)
+    if "Baseline" not in names:
+        raise ValueError("explicit Baseline scenario required")
+    return (
+        pd.concat(demand_outputs, ignore_index=True).sort_values(["Scenario"] + WEEK_KEY).reset_index(drop=True),
+        pd.concat(pool_outputs, ignore_index=True).sort_values(["Scenario", "Plant_ID", "Order_Date"]).reset_index(drop=True),
+    )

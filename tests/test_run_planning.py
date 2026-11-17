@@ -12,6 +12,7 @@ ROOT = Path(__file__).parents[1]
 DATA_ROOT = ROOT / "data"
 
 
+@unittest.skipUnless(all((DATA_ROOT / name).is_file() for name in ["processed/plant_product_weekly_demand.csv", "processed/capacity_utilization_weekly.csv", "processed/inventory_snapshot_weekly.csv", "processed/product_abc_classification.csv", "master/product_plant_mapping.csv"]), "optional legacy reference pipeline inputs unavailable")
 class EndToEndRunnerTests(unittest.TestCase):
     def protected_hashes(self):
         paths = [

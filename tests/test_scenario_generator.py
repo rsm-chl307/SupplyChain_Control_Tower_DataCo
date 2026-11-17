@@ -13,6 +13,7 @@ from src.scenario_generator import (
 INPUT_PATH = Path(__file__).parents[1] / "data/processed/planning_snapshot_20170101_20171231.csv"
 
 
+@unittest.skipUnless(INPUT_PATH.is_file(), "optional legacy reference snapshot unavailable")
 class ScenarioGeneratorTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

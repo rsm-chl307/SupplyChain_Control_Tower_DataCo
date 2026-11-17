@@ -1,0 +1,205 @@
+{
+  "data_mode": "USER_DATA",
+  "source_profile": "DATACO_REFERENCE",
+  "assumption_version": "dataco-reference-synthetic-planning-v1",
+  "planning_interpretation": "RETROSPECTIVE",
+  "planning_start_week": "2017-01-01",
+  "planning_end_week": "2017-03-26",
+  "product_ids": [
+    "37",
+    "44",
+    "93",
+    "116",
+    "134",
+    "135",
+    "172",
+    "191",
+    "235",
+    "249",
+    "273",
+    "276",
+    "278",
+    "282",
+    "365",
+    "403",
+    "502",
+    "564",
+    "565",
+    "567",
+    "572",
+    "627",
+    "642",
+    "703",
+    "728",
+    "771",
+    "775",
+    "778",
+    "792",
+    "793",
+    "797",
+    "804",
+    "810",
+    "818",
+    "821",
+    "822",
+    "823",
+    "825",
+    "828",
+    "835",
+    "885",
+    "886",
+    "893",
+    "897",
+    "905",
+    "906",
+    "917",
+    "924",
+    "926",
+    "957",
+    "977",
+    "1004",
+    "1014",
+    "1073"
+  ],
+  "demand_format": "ORDER_LINES",
+  "source_is_complete": true,
+  "status_eligibility": {
+    "COMPLETE": true,
+    "CLOSED": true,
+    "PROCESSING": true,
+    "CANCELED": false,
+    "SUSPECTED_FRAUD": false,
+    "ON_HOLD": false,
+    "PAYMENT_REVIEW": false,
+    "PENDING": false,
+    "PENDING_PAYMENT": false
+  },
+  "unknown_status_policy": "EXCLUDE",
+  "forced_excluded_statuses": [
+    "CANCELED",
+    "SUSPECTED_FRAUD"
+  ],
+  "eligibility_version": "dataco-owner-approved-20261117",
+  "priority_value_mapping": {
+    "A": 3,
+    "B": 2,
+    "C": 1
+  },
+  "quantity_step": 0,
+  "allocation_policy": "PRIORITY_NET_UNITS_BACKLOG_FIRST_WITHIN_PRODUCT",
+  "scenarios": [
+    {
+      "Scenario": "Baseline",
+      "Demand_Multiplier": 1.0,
+      "Capacity_Multiplier": 1.0,
+      "Disruption_Plants": [
+        "P1"
+      ],
+      "Disruption_Weeks": null,
+      "Backlog_Policy": "CARRY_FORWARD"
+    },
+    {
+      "Scenario": "Demand_Surge",
+      "Demand_Multiplier": 1.1,
+      "Capacity_Multiplier": 1.0,
+      "Disruption_Plants": [
+        "P1"
+      ],
+      "Disruption_Weeks": null,
+      "Backlog_Policy": "CARRY_FORWARD"
+    },
+    {
+      "Scenario": "Capacity_Disruption",
+      "Demand_Multiplier": 1.0,
+      "Capacity_Multiplier": 0.8,
+      "Disruption_Plants": [
+        "P1"
+      ],
+      "Disruption_Weeks": null,
+      "Backlog_Policy": "CARRY_FORWARD"
+    },
+    {
+      "Scenario": "Combined_Stress",
+      "Demand_Multiplier": 1.1,
+      "Capacity_Multiplier": 0.8,
+      "Disruption_Plants": [
+        "P1"
+      ],
+      "Disruption_Weeks": null,
+      "Backlog_Policy": "CARRY_FORWARD"
+    }
+  ],
+  "assumptions": {
+    "quantity_unit": "EA",
+    "opening_backlog": "ZERO",
+    "external_receipts": "NONE"
+  },
+  "capacity_calibration": {
+    "start_week": "2017-01-01",
+    "end_week": "2017-03-26",
+    "target_utilization": 0.75,
+    "capacity_version": "dataco-cohort-synthetic-capacity-v1"
+  },
+  "files": {
+    "products": {
+      "path": "../../../data/master/dim_product.csv",
+      "columns": {
+        "Product_ID": "Product Card Id",
+        "Product_Name": "Product Name"
+      },
+      "provenance": "REFERENCE_DATA",
+      "encoding": "utf-8"
+    },
+    "plants": {
+      "path": "../../../data/master/dim_plant.csv",
+      "columns": {
+        "Plant_ID": "Plant_ID",
+        "Plant_Name": "Plant_Name"
+      },
+      "provenance": "SYNTHETIC_REFERENCE_NETWORK",
+      "encoding": "utf-8"
+    },
+    "product_plant_mapping": {
+      "path": "../../../data/master/product_plant_mapping.csv",
+      "columns": {
+        "Product_ID": "Product Card Id",
+        "Plant_ID": "Plant_ID"
+      },
+      "provenance": "SYNTHETIC_REFERENCE_NETWORK",
+      "encoding": "utf-8"
+    },
+    "demand": {
+      "path": "../../../data/raw/DataCoSupplyChainDataset.csv",
+      "columns": {
+        "Product_ID": "Product Card Id",
+        "Order_Line_ID": "Order Item Id",
+        "Status": "Order Status",
+        "Date": "order date (DateOrders)",
+        "Quantity": "Order Item Quantity"
+      },
+      "provenance": "REFERENCE_DATA",
+      "encoding": "latin1"
+    },
+    "priorities": {
+      "path": "../../../data/processed/product_abc_classification.csv",
+      "columns": {
+        "Product_ID": "Product Card Id",
+        "Planning_Priority": "ABC_Class"
+      },
+      "provenance": "DERIVED_FULL_HISTORY_REFERENCE",
+      "encoding": "utf-8"
+    },
+    "workload_factors": {
+      "path": "synthetic_workload_factors.csv",
+      "columns": {},
+      "provenance": "SYNTHETIC_ASSUMPTION",
+      "encoding": "utf-8"
+    },
+    "initial_inventory": {
+      "path": "synthetic_initial_inventory.csv",
+      "columns": {},
+      "provenance": "SYNTHETIC_ASSUMPTION",
+      "encoding": "utf-8"
+    }
+  }
+}

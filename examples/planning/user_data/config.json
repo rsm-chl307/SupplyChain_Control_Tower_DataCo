@@ -1,0 +1,145 @@
+{
+  "planning_start_week": "2017-01-08",
+  "planning_end_week": "2017-01-22",
+  "quantity_step": 0,
+  "allocation_policy": "PRIORITY_NET_UNITS_BACKLOG_FIRST_WITHIN_PRODUCT",
+  "scenarios": [
+    {
+      "Scenario": "Baseline",
+      "Demand_Multiplier": 1.0,
+      "Capacity_Multiplier": 1.0,
+      "Disruption_Plants": [
+        "SITE-1"
+      ],
+      "Disruption_Weeks": null,
+      "Backlog_Policy": "CARRY_FORWARD"
+    },
+    {
+      "Scenario": "Demand_Surge",
+      "Demand_Multiplier": 1.1,
+      "Capacity_Multiplier": 1.0,
+      "Disruption_Plants": [
+        "SITE-1"
+      ],
+      "Disruption_Weeks": null,
+      "Backlog_Policy": "CARRY_FORWARD"
+    },
+    {
+      "Scenario": "Capacity_Disruption",
+      "Demand_Multiplier": 1.0,
+      "Capacity_Multiplier": 0.8,
+      "Disruption_Plants": [
+        "SITE-1"
+      ],
+      "Disruption_Weeks": null,
+      "Backlog_Policy": "CARRY_FORWARD"
+    },
+    {
+      "Scenario": "Combined_Stress",
+      "Demand_Multiplier": 1.1,
+      "Capacity_Multiplier": 0.8,
+      "Disruption_Plants": [
+        "SITE-1"
+      ],
+      "Disruption_Weeks": null,
+      "Backlog_Policy": "CARRY_FORWARD"
+    }
+  ],
+  "data_mode": "USER_DATA",
+  "assumption_version": "user-csv-example-v1",
+  "planning_interpretation": "USER_PROVIDED_PLAN",
+  "demand_format": "WEEKLY",
+  "status_eligibility": {
+    "RELEASED": true,
+    "BLOCKED": false
+  },
+  "eligibility_version": "user-example-v1",
+  "files": {
+    "products": {
+      "path": "products.csv",
+      "columns": {
+        "Product_ID": "sku",
+        "Product_Name": "title",
+        "Quantity_Unit": "uom",
+        "Planning_Priority": "rank"
+      },
+      "provenance": "SYNTHETIC_EXAMPLE"
+    },
+    "plants": {
+      "path": "plants.csv",
+      "columns": {
+        "Plant_ID": "site",
+        "Plant_Name": "label"
+      },
+      "provenance": "SYNTHETIC_EXAMPLE"
+    },
+    "product_plant_mapping": {
+      "path": "mapping.csv",
+      "columns": {
+        "Product_ID": "sku",
+        "Plant_ID": "site"
+      },
+      "provenance": "SYNTHETIC_EXAMPLE"
+    },
+    "demand": {
+      "path": "demand.csv",
+      "columns": {
+        "Product_ID": "sku",
+        "Plant_ID": "site",
+        "Week": "week_ending",
+        "Demand_Qty": "units",
+        "Status": "state",
+        "Quantity_Unit": "uom"
+      },
+      "provenance": "SYNTHETIC_EXAMPLE"
+    },
+    "weekly_capacity": {
+      "path": "capacity.csv",
+      "columns": {
+        "Plant_ID": "site",
+        "Week": "week_ending",
+        "Capacity": "available_load",
+        "Workload_Unit": "load_unit"
+      },
+      "provenance": "SYNTHETIC_EXAMPLE"
+    },
+    "workload_factors": {
+      "path": "factors.csv",
+      "columns": {
+        "Product_ID": "sku",
+        "Workload_Factor": "load_per_unit",
+        "Workload_Unit": "load_unit"
+      },
+      "provenance": "SYNTHETIC_EXAMPLE"
+    },
+    "initial_inventory": {
+      "path": "initial_inventory.csv",
+      "columns": {
+        "Plant_ID": "site",
+        "Product_ID": "sku",
+        "Beginning_Inventory": "stock"
+      },
+      "provenance": "SYNTHETIC_EXAMPLE"
+    },
+    "opening_backlog": {
+      "path": "opening_backlog.csv",
+      "columns": {
+        "Plant_ID": "site",
+        "Product_ID": "sku",
+        "Beginning_Backlog": "open_qty"
+      },
+      "provenance": "SYNTHETIC_EXAMPLE"
+    },
+    "external_receipts": {
+      "path": "receipts.csv",
+      "columns": {
+        "Receipt_ID": "event",
+        "Plant_ID": "site",
+        "Product_ID": "sku",
+        "Week": "usable_week",
+        "External_Receipts_Qty": "received_units"
+      },
+      "provenance": "SYNTHETIC_EXAMPLE"
+    }
+  }
+}

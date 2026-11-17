@@ -1,5 +1,7 @@
 # Project Journal
 
+> **Route B planning record — 2026-11-17:** [Specification package](../improvement_program/README.md) prepared for owner review; no improvement WP implemented or authorized. Legacy stage completion records below retain their historical meaning. Route B Stage 0 owner freeze and every implementation authorization remain separate gates.
+
 ## Stage 0 — Project Definition
 
 ### Objective
@@ -179,3 +181,19 @@ No Power BI, UI, backend business-rule, or dashboard-page implementation was sta
 ## Dashboard Integration MVP
 
 Implemented a separate Streamlit Scenario Planning experience at `dashboard/scenario_planning_app.py` while preserving the completed PBIX Control Tower. The app delegates execution to `src/run_planning.py`, loads prepared Stage 5/4/3 outputs, and provides scenario overview, baseline comparison, and allocation drill-down views. Focused dashboard integration tests pass; no backend business rules, historical artifacts, PBIX pages, or existing Control Tower notebooks were changed.
+
+
+## Revised three-day planning upgrade — implementation record
+
+The owner replaced the broad six-WP delivery plan with a focused sequential planning target. The implemented vertical slice now runs raw-order eligibility through workload allocation, continuous inventory/backlog, four scenarios, independent validation, KPI output and prepared Streamlit views. Legacy functions and historical artifacts remain separate.
+
+Data inspection traced 588 resampled zero weeks, 11,508 outside-lifespan unknown combinations and 344,529 synthetic replenishment units already embedded in later opening stock. No actual procurement or production standards were found. The new input path therefore requires explicit coverage, factor, capacity, opening-state and receipt assumptions rather than replaying historical simulation stock.
+
+A fully synthetic repeatable fixture and successful CLI run are saved under tmp; they do not approve DataCo's production whitelist. Current evidence, actual test counts and generated run path are recorded in tmp/planning_data_inspection_2026-11-17.md. No completion claim is made for all original WPs or unverified Power BI runtime behavior.
+
+
+## Revised data strategy — synthetic and user CSV sources
+
+Implemented two portable data modes feeding one canonical bundle and the same planning/validation/scenario/KPI functions. Added working examples, nine header templates, configurable column/status mappings and capability diagnostics. DataCo is an optional reference profile, with owner-approved qualification and separate synthetic planning inputs.
+
+Verified both examples through the CLI and successfully published the optional DataCo reference run after correcting a machine-roundoff-only capacity residual. Original datasets and PBIX remain protected. Reference-free test execution is checked in an isolated copy with no data directory. Final counts and source hashes are recorded in tmp/data_source_extensibility_2026-11-17.md.

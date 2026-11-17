@@ -22,6 +22,7 @@ FULL_START = "2015-01-04"
 FULL_END = "2018-02-04"
 
 
+@unittest.skipUnless(BASELINE.is_file() and all((DATA_ROOT / name).is_file() for name in ["processed/plant_product_weekly_demand.csv", "processed/capacity_utilization_weekly.csv", "processed/inventory_snapshot_weekly.csv", "processed/product_abc_classification.csv", "master/product_plant_mapping.csv"]), "optional legacy reference pipeline inputs unavailable")
 class PlanningPipelineTests(unittest.TestCase):
     def run_pipeline(self, directory: str, start: str = FULL_START, end: str = FULL_END):
         output = Path(directory) / f"planning_snapshot_{start.replace('-', '')}_{end.replace('-', '')}.csv"

@@ -1,5 +1,7 @@
 # Developer Notes — Scenario Planning Extension
 
+> **Scope notice — 2026-11-17:** The implementation records below describe the legacy baseline. [Route B permanent specification](../improvement_program/README.md) documents approved future direction and unresolved decisions. Documentation planning alone does not authorize implementation or alter historical rules, code or artifacts.
+
 ## Purpose and Boundary
 
 The existing DataCo-based Control Tower is the completed monitoring baseline. Its notebooks, processed CSV datasets, risk calculations, and Power BI dashboard remain unchanged. It answers what happened in demand, inventory, capacity, and service risk. Scenario Planning is a separate future planning layer that will reuse those outputs to evaluate what-if decisions.
@@ -77,3 +79,44 @@ The runner requires a planning start/end week and disruption plant, with approve
 ## Dashboard Integration MVP
 
 A separate Streamlit presentation layer is implemented at `dashboard/scenario_planning_app.py`. It preserves the existing Power BI Control Tower and consumes the runner outputs (`performance_result.csv`, `allocation_result.csv`, and `scenario_snapshot.csv`) without duplicating scenario, allocation, or KPI logic. The app exposes planning horizon, demand surge, capacity disruption, and disruption plant controls, invokes `src/run_planning.py`, and provides Scenario Overview, Scenario Comparison, and Capacity Allocation Detail views.
+
+
+## Revised three-day sequential upgrade — implemented vertical slice
+
+The owner authorized the reduced scope after the original planning-only program. Actual executable contract: [sequential_v1](../improvement_program/04_data_contracts.md). This is not completion of every original Route B WP.
+
+Implemented:
+- Explicit dual demand with source-line exclusions and no embedded DataCo whitelist.
+- Coverage-aware input preparation; UNKNOWN/partial weeks block execution.
+- Product equivalent workload, separate plant-week pools, explicit calibration inputs.
+- Multiweek inventory, same-week production, external receipt events, both shortage modes and isolated scenarios.
+- Existing product-priority allocation retained through an explicit caller policy; backlog served first within each product.
+- Four configurable scenario kinds without rewriting historical demand.
+- Independent source/requirement/greedy/cohort/conservation checks; stronger legacy validation.
+- Production coverage versus demand fulfillment, terminal stock/backlog, loss flows and workload metrics.
+- Isolated manifest-backed runs and prepared-result loading in the existing Streamlit app. Optional Plotly absence no longer blocks table/new-mode imports.
+
+New source files: planning_inputs.py, demand_preparation.py, workload_model.py, inventory_engine.py, sequential_planner.py, sequential_validator.py.
+Existing source changes: allocation_engine.py, allocation_validator.py, scenario_generator.py, kpi_engine.py, run_planning.py and dashboard/scenario_planning_app.py.
+Five focused test files cover inputs, independent corruption checks, transitions, sequential integration and pipeline publication.
+
+The persisted demonstration under tmp/planning_upgrade_demo_2026-11-17 is entirely synthetic test data; it does not resolve real DataCo eligibility or establish actual manufacturing/procurement facts. Reproduce with the command in the root README. Existing data/master, raw, processed baselines and PBIX are protected.
+
+Remaining real-source choices: status whitelist (particularly hold/payment/pending states), actual or explicitly synthetic opening supply, and any change from retained product-first priority to a global backlog-first override. Input CSVs/configuration must identify source/provenance; no unspecified values become production defaults.
+
+Deferred: full original Route B scope, new risk thresholds/probabilities, DOI/safety-stock model expansion, automatic procurement, forecast generation, plant-specific factors, configurable production lead times and PBIX page consolidation. No new permanent hierarchy was created.
+
+
+## Source-independent CSV intake — implemented 2026-11-17
+
+Current external contract: [Planning CSV Inputs](../planning_csv_inputs.md). SYNTHETIC_DEMO and USER_DATA both create CanonicalPlanningInputs and share the existing scenario, sequential planner, independent validator and KPI call sequence. No duplicate planning engine was introduced.
+
+New source adapter: src/csv_planning_inputs.py. Canonical bundle lives in src/planning_inputs.py; source-neutral order preparation is separate from the backward-compatible DataCo wrapper. Runner API run_csv_planning requires no data root. Config-relative CSVs support canonical-to-source column mappings, custom status meanings and string/leading-zero identifiers.
+
+Permanent examples and nine CSV templates are under examples/planning. The synthetic example preserves the previous fixture's quantities/workload; the user example uses custom headers and SKUs. Optional DataCo is a USER_DATA profile with the approved whitelist and explicitly synthetic stock/workload/capacity assumptions. Its prior whitelist/opening-method blockers are resolved for that demonstration; no profile rule is universal.
+
+Intake reports identify missing capabilities, explicit assumptions, source classifications and canonical keys/types. Missing demand stays UNKNOWN. Unit/foreign-key/cardinality checks precede simulation. Optional factors, receipts, backlog and zero initialization require explicit settings when absent. DataCo/reference-dependent regression classes skip only when their optional artifacts are unavailable; portable engine tests remain executable without a data directory.
+
+An actual DataCo reference run exposed a -1.14e-13 machine-roundoff capacity balance. The shared planner now normalizes only negligible negative residuals and still rejects over-allocation beyond the existing numeric tolerance. A hand-reproduced regression and KPI pool-balance checks cover the fix.
+
+The Streamlit entry now defaults to the portable sequential mode; reference inputs are not read on initial load. Full upload/mapping wizards remain deferred. Detailed tests, run IDs and protected-data checks are in tmp/data_source_extensibility_2026-11-17.md.
