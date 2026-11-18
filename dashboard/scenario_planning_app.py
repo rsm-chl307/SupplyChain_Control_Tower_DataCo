@@ -28,6 +28,14 @@ if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from src.run_planning import PlanningRunError, run_csv_planning, run_planning, run_sequential_planning
+from src.planning_risk import (
+    plant_bottleneck_summary,
+    product_risk_ranking,
+    risk_driver_details,
+    scenario_plant_deterioration,
+    scenario_product_deterioration,
+    scenario_risk_comparison,
+)
 
 
 DATA_ROOT = REPOSITORY_ROOT / "data"
@@ -830,13 +838,159 @@ def load_sequential_outputs(output_dir: str | Path) -> dict[str, pd.DataFrame]:
     outputs = {}
     for name, artifact_name in names.items():
         frame = pd.read_csv(directory / manifest["Artifacts"][artifact_name]["Path"], parse_dates=["Order_Date"], converters={name: str for name in ["Product Card Id", "Plant_ID", "Scenario", "Run_ID", "Schema_Version", "Product Name", "Factor_Version", "Workload_Unit"]})
-        if frame.empty or "Run_ID" not in frame or set(frame.Run_ID) != {manifest["Run_ID"]} or set(frame.Schema_Version) != {"sequential_v1"}:
-            raise ValueError("mixed or invalid sequential run identity")
+        if frame.empty:
+            raise ValueError(f"published sequential artifact is empty: {artifact_name}")
+        if "Run_ID" not in frame or "Schema_Version" not in frame or set(frame.Run_ID) != {manifest["Run_ID"]} or set(frame.Schema_Version) != {"sequential_v1"}:
+            raise ValueError(f"mixed or invalid sequential run identity: {artifact_name}")
         outputs[name] = frame
+    required_allocation = {
+        "Scenario", "Plant_ID", "Product Card Id", "Product Name", "Order_Date", "Planning_Priority",
+        "Allocation_Order", "Scenario_Qualified_Demand", "Incremental_Demand", "Beginning_Inventory",
+        "Beginning_Backlog", "External_Receipts_Qty", "Required_Production_Qty", "Internal_Production_Qty",
+        "Workload_Factor", "Workload_Unit", "Allocated_Workload", "Unmet_Workload", "Unmet_Production_Qty",
+        "Fulfilled_Backlog_Qty", "Fulfilled_Current_Qty", "Fulfilled_Horizon_Backlog_Qty",
+        "Current_Unfulfilled_Qty", "Ending_Inventory", "Ending_Backlog", "Lost_Sales_Qty", "Backlog_Policy",
+    }
+    missing_allocation = sorted(required_allocation - set(outputs["allocation"].columns))
+    if missing_allocation:
+        raise ValueError(f"sequential allocation schema mismatch; missing fields: {', '.join(missing_allocation)}")
+    required_pools = {"Scenario", "Plant_ID", "Order_Date", "Baseline_Workload_Capacity",
+                      "Available_Workload_Capacity", "Allocated_Workload", "Remaining_Workload_Capacity",
+                      "Unmet_Workload"}
+    missing_pools = sorted(required_pools - set(outputs["pools"].columns))
+    if missing_pools:
+        raise ValueError(f"sequential capacity pool schema mismatch; missing fields: {', '.join(missing_pools)}")
     required_metrics = {"Production_Coverage_Rate", "Demand_Fulfillment_Rate", "Ending_Inventory", "Ending_Backlog", "Lost_Sales_Qty"}
     if not required_metrics.issubset(outputs["performance"]):
         raise ValueError("sequential KPI schema mismatch")
     return outputs
+
+
+def _planning_risk_summary(outputs: dict[str, pd.DataFrame], selected_scenario: str) -> None:
+    """Render risk views from the already-published result artifacts."""
+    try:
+        product_risks = product_risk_ranking(outputs["allocation"])
+        plants = plant_bottleneck_summary(outputs["pools"])
+        drivers = risk_driver_details(outputs["allocation"], outputs["pools"])
+        scenario_comparison = scenario_risk_comparison(outputs["performance"])
+    except (KeyError, ValueError) as exc:
+        st.warning(f"Planning risk summary is unavailable for this run: {exc}")
+        return
+    if product_risks.empty or plants.empty:
+        st.info("This run has no product or plant-week records to summarize.")
+        return
+
+    product_tab, plant_tab, driver_tab, scenario_tab = st.tabs(
+        ["Product Risk", "Plant Bottlenecks", "Risk Drivers", "Scenario Risk"]
+    )
+    current_products = product_risks[product_risks.Scenario.eq(selected_scenario)].copy()
+    with product_tab:
+        st.caption("Risk order uses visible service, backlog, lost-sales, and production-coverage indicators; there is no composite risk score.")
+        columns = ["Risk_Category", "Product_Name", "Product Card Id", "Planning_Priority", "Plants",
+                   "Qualified_Demand", "Demand_Fulfillment_Rate", "Current_Demand_Unfulfilled_Qty",
+                   "Production_Coverage_Rate", "Ending_Inventory", "Ending_Backlog", "Lost_Sales_Qty",
+                   "Unmet_Workload", "Backlog_Policy", "Risk_Reason"]
+        st.dataframe(current_products[columns], hide_index=True, use_container_width=True)
+        product_ids = current_products["Product Card Id"].astype(str).tolist()
+        if product_ids:
+            selected_product = st.selectbox("Product drill-down", product_ids, key=f"risk_product_{selected_scenario}")
+            detail = current_products[current_products["Product Card Id"].astype(str).eq(selected_product)].iloc[0]
+            metrics = st.columns(5)
+            for card, column in zip(metrics, ["Demand_Fulfillment_Rate", "Production_Coverage_Rate", "Ending_Inventory", "Ending_Backlog", "Lost_Sales_Qty"]):
+                value = detail[column]
+                rendered = "N/A" if pd.isna(value) else (f"{value:.1%}" if column.endswith("Rate") else f"{value:,.2f}")
+                card.metric(column.replace("_", " "), rendered)
+            st.caption(detail.Risk_Reason)
+
+    current_plants = plants[plants.Scenario.eq(selected_scenario)].copy()
+    with plant_tab:
+        st.dataframe(current_plants, hide_index=True, use_container_width=True)
+        plant_ids = current_plants.Plant_ID.astype(str).tolist()
+        if plant_ids:
+            selected_plant = st.selectbox("Plant drill-down", plant_ids, key=f"risk_plant_{selected_scenario}")
+            weekly = outputs["pools"].loc[
+                outputs["pools"].Scenario.eq(selected_scenario)
+                & outputs["pools"].Plant_ID.astype(str).eq(selected_plant)
+            ].copy().sort_values("Order_Date")
+            weekly["Capacity_Utilization"] = weekly.Allocated_Workload.div(
+                weekly.Available_Workload_Capacity.where(weekly.Available_Workload_Capacity.ne(0))
+            )
+            weekly_columns = ["Order_Date", "Available_Workload_Capacity", "Allocated_Workload",
+                              "Remaining_Workload_Capacity", "Capacity_Utilization", "Unmet_Workload", "Workload_Shortage"]
+            st.dataframe(weekly[weekly_columns], hide_index=True, use_container_width=True)
+            chart = weekly.set_index("Order_Date")["Capacity_Utilization"]
+            st.bar_chart(chart)
+            contributors = outputs["allocation"].loc[
+                outputs["allocation"].Scenario.eq(selected_scenario)
+                & outputs["allocation"].Plant_ID.astype(str).eq(selected_plant)
+            ].groupby(["Product Card Id", "Product Name", "Planning_Priority"], as_index=False).agg(
+                Allocated_Workload=("Allocated_Workload", "sum"),
+                Unmet_Workload=("Unmet_Workload", "sum"),
+                Required_Production_Qty=("Required_Production_Qty", "sum"),
+                Internal_Production_Qty=("Internal_Production_Qty", "sum"),
+            ).sort_values(["Unmet_Workload", "Allocated_Workload", "Planning_Priority"],
+                          ascending=[False, False, False], kind="mergesort")
+            st.markdown("**Products associated with this plant's workload pressure**")
+            st.dataframe(contributors, hide_index=True, use_container_width=True)
+
+    current_drivers = drivers[drivers.Scenario.eq(selected_scenario)].copy()
+    with driver_tab:
+        st.caption("Signals show conditions observed in the same product/plant/week. They are not validated causal attributions. Workload factors and capacity baselines retain the run's declared provenance and assumptions.")
+        products = current_drivers[["Product Card Id", "Product Name"]].drop_duplicates().sort_values("Product Name")
+        if not products.empty:
+            selected_product = st.selectbox(
+                "Product whose risk signals to inspect", products["Product Card Id"].astype(str).tolist(),
+                key=f"risk_driver_product_{selected_scenario}",
+            )
+            selected_rows = current_drivers[
+                current_drivers["Product Card Id"].astype(str).eq(selected_product)
+            ].sort_values(["Order_Date", "Plant_ID", "Allocation_Order"])
+            driver_columns = ["Order_Date", "Plant_ID", "Product Card Id", "Planning_Priority", "Allocation_Order",
+                              "Scenario_Qualified_Demand", "Incremental_Demand", "Beginning_Inventory", "Beginning_Backlog",
+                              "Workload_Factor", "Workload_Unit", "Required_Production_Qty", "Internal_Production_Qty",
+                              "Unmet_Production_Qty", "Product_Allocated_Workload", "Product_Unmet_Workload",
+                              "Available_Workload_Capacity", "Plant_Week_Allocated_Workload", "Remaining_Workload_Capacity",
+                              "Plant_Week_Unmet_Workload", "Plant_Week_Capacity_Utilization",
+                              "Capacity_Reduction_From_Baseline", "Ending_Backlog", "Lost_Sales_Qty", "Risk_Signals"]
+            st.dataframe(selected_rows[driver_columns], hide_index=True, use_container_width=True)
+            constrained = selected_rows[selected_rows.Plant_Week_Unmet_Workload.gt(1e-9)]
+            if not constrained.empty:
+                pressure = constrained.sort_values(["Plant_Week_Unmet_Workload", "Order_Date"],
+                                                   ascending=[False, True]).iloc[0]
+                peers = current_drivers[
+                    current_drivers.Plant_ID.eq(pressure.Plant_ID)
+                    & current_drivers.Order_Date.eq(pressure.Order_Date)
+                ].sort_values("Allocation_Order")
+                st.markdown(f"**Priority allocation context: {pressure.Plant_ID}, {pressure.Order_Date:%Y-%m-%d}**")
+                st.dataframe(peers[["Product Name", "Product Card Id", "Planning_Priority", "Allocation_Order",
+                                    "Required_Production_Qty", "Internal_Production_Qty", "Product_Unmet_Workload",
+                                    "Product_Allocated_Workload", "Risk_Signals"]], hide_index=True, use_container_width=True)
+
+    with scenario_tab:
+        st.caption("Deltas are descriptive comparisons to Baseline. Backlog_Policy is shown because policy changes also affect service, backlog, and lost-sales outcomes.")
+        st.dataframe(scenario_comparison, hide_index=True, use_container_width=True)
+        if selected_scenario != "Baseline":
+            product_changes = scenario_product_deterioration(product_risks, selected_scenario)
+            plant_changes = scenario_plant_deterioration(outputs["performance"], selected_scenario)
+            st.markdown("**Largest product deterioration versus Baseline**")
+            if product_changes.empty:
+                st.info("A Baseline or matching product outcome is unavailable for this comparison.")
+            else:
+                st.dataframe(product_changes[["Product_Name", "Product Card Id", "Demand_Fulfillment_Change",
+                                              "Ending_Backlog_Change", "Lost_Sales_Change", "Baseline_Backlog_Policy",
+                                              "Backlog_Policy", "Backlog_Policy_Changed", "Risk_Category", "Risk_Reason"]].head(10),
+                             hide_index=True, use_container_width=True)
+            st.markdown("**Largest plant deterioration versus Baseline**")
+            if plant_changes.empty:
+                st.info("A Baseline or matching plant KPI is unavailable for this comparison.")
+            else:
+                plant_change_columns = ["Plant_ID", "Demand_Fulfillment_Rate_Change", "Production_Coverage_Rate_Change",
+                                        "Ending_Backlog_Change", "Lost_Sales_Qty_Change", "Capacity_Utilization_Change",
+                                        "Baseline_Backlog_Policy", "Backlog_Policy", "Backlog_Policy_Changed"]
+                if "Bottleneck_Plant_Weeks_Change" in plant_changes:
+                    plant_change_columns.insert(6, "Bottleneck_Plant_Weeks_Change")
+                st.dataframe(plant_changes[plant_change_columns].head(10),
+                             hide_index=True, use_container_width=True)
 
 
 def _sequential_views() -> None:
@@ -897,7 +1051,9 @@ def _sequential_views() -> None:
         value = row[column]
         card.metric(column.replace("_", " "), "N/A" if pd.isna(value) else (f"{value:.1%}" if column.endswith("Rate") or column == "Capacity_Utilization" else f"{value:,.2f}"))
     st.caption("0/0 ratios are N/A. Scenario fulfillment includes later service of horizon-origin backlog; weekly fulfillment refers to that week's current-demand cohort. Ending stocks are never summed across weeks.")
-    overview, comparison, detail = st.tabs(["Scenario Overview", "Scenario Comparison", "Capacity Allocation Detail"])
+    overview, comparison, detail, risk = st.tabs(
+        ["Scenario Overview", "Scenario Comparison", "Capacity Allocation Detail", "Planning Risk Summary"]
+    )
     with overview:
         weekly = performance[performance.Aggregation_Level.eq("Scenario × Week") & performance.Scenario.eq(scenario)]
         st.line_chart(weekly.set_index("Order_Date")[["Ending_Inventory", "Ending_Backlog", "Lost_Sales_Qty"]])
@@ -911,6 +1067,8 @@ def _sequential_views() -> None:
                    "Required_Production_Qty", "Internal_Production_Qty", "Workload_Factor", "Allocated_Workload",
                    "Fulfilled_Backlog_Qty", "Fulfilled_Current_Qty", "Ending_Inventory", "Ending_Backlog", "Lost_Sales_Qty"]
         st.dataframe(frame[columns].sort_values(["Order_Date", "Plant_ID", "Allocation_Order"]), hide_index=True, use_container_width=True)
+    with risk:
+        _planning_risk_summary(outputs, scenario)
 
 def main() -> None:
     st.set_page_config(page_title="Scenario Planning Decision Support", layout="wide")

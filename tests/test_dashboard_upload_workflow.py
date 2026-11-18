@@ -59,6 +59,8 @@ class DashboardUploadWorkflowTests(unittest.TestCase):
         self.assertTrue(any("Active results:" in item.value for item in app.caption))
         self.assertIn("Download KPI results", [item.label for item in app.get("download_button")])
         self.assertIn("Download allocation detail", [item.label for item in app.get("download_button")])
+        self.assertIn("Planning Risk Summary", [item.label for item in app.get("tab")])
+        self.assertTrue(any("Product Risk" in item.label for item in app.get("tab")))
 
     def test_duplicate_column_mapping_is_reported_and_blocks_execution(self):
         app = self.app_with_user_example()
