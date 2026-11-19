@@ -120,3 +120,11 @@ Intake reports identify missing capabilities, explicit assumptions, source class
 An actual DataCo reference run exposed a -1.14e-13 machine-roundoff capacity balance. The shared planner now normalizes only negligible negative residuals and still rejects over-allocation beyond the existing numeric tolerance. A hand-reproduced regression and KPI pool-balance checks cover the fix.
 
 The Streamlit entry now defaults to the portable sequential mode; reference inputs are not read on initial load. Full upload/mapping wizards remain deferred. Detailed tests, run IDs and protected-data checks are in tmp/data_source_extensibility_2026-11-17.md.
+
+## Phase 3 WP2 — Scenario Trade-off Analysis (2026-11-18)
+
+Owner-authorized implementation follows the complete [WP2 v1.0 specification](../wp2_scenario_tradeoff_analysis_specification.md), independently of historical Route B work-package numbering. [Implementation progress and acceptance evidence](../wp2_implementation_progress.md) records sequential WP2.1–WP2.4 gates.
+
+`src/scenario_comparison.py` provides explicit same-run ComparisonInput/Scope/Result contracts and pure comparison; `src/comparison_io.py` reuses the WP1 published loader, adds row-count validation and exports comparison context/metrics/cohort/evidence CSVs. Service and terminal backlog use the existing sequential KPI engine; workload and current-week-unfulfilled flows aggregate native allocation rows. Fixed reference priorities define SELECTED and its complement; candidate priority changes never reclassify products. Comparisons distinguish COMPARABLE, DESCRIPTIVE_ONLY and BLOCKED, with POLICY_CONTRAST, input differences, N/A and workload incompatibility reasons.
+
+The existing Streamlit sequential view has one additional Scenario Trade-off Analysis tab, explicit unselected scenario controls, empty-by-default priorities, three-group comparisons, source references/downloads and an explicit side/product handoff into existing WP1 navigation. Shared capacity stays separate and unique at plant-week grain. WP1 investigation helpers/exports, upload workflow, planning/allocation/inventory/KPI formulas and existing tests are unchanged from the pre-WP2 worktree. No cross-run comparison, replay, new scenarios, actions, AI, dependencies or PBIX changes.

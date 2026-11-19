@@ -339,3 +339,79 @@ def scenario_plant_deterioration(performance: pd.DataFrame, scenario: str,
         ["Demand_Fulfillment_Rate_Change", "Ending_Backlog_Change", "Lost_Sales_Qty_Change", "Plant_ID"],
         ascending=[True, False, False, True], na_position="last", kind="mergesort",
     ).reset_index(drop=True)
+
+
+INVESTIGATION_KEY = ["Run_ID", "Scenario", "Plant_ID", "Product Card Id", "Order_Date"]
+
+
+def investigation_views(
+    allocation: pd.DataFrame, pools: pd.DataFrame, *, run_id: str,
+    scenario: str, plant_id: str, product_id: str, week: object,
+) -> dict[str, pd.DataFrame]:
+    """Select published observations without joining source detail into quantities.
+
+    Capacity remains a separate, unique plant-week row. Adjacent weeks are the
+    selected product's previous/selected/next calendar week, not stock totals.
+    """
+    _require_columns(allocation, INVESTIGATION_KEY, "allocation_result")
+    _require_columns(pools, ["Run_ID", "Scenario", "Plant_ID", "Order_Date"], "capacity_pools")
+    source = allocation.loc[allocation.Run_ID.eq(run_id) & allocation.Scenario.eq(scenario)].copy()
+    capacity = pools.loc[pools.Run_ID.eq(run_id) & pools.Scenario.eq(scenario)].copy()
+    source["Order_Date"] = pd.to_datetime(source.Order_Date, errors="raise")
+    capacity["Order_Date"] = pd.to_datetime(capacity.Order_Date, errors="raise")
+    if source[INVESTIGATION_KEY].isna().any().any() or source.duplicated(INVESTIGATION_KEY).any():
+        raise ValueError("allocation_result has null or duplicate investigation keys")
+    trajectory = source.loc[source.Plant_ID.eq(plant_id) & source["Product Card Id"].eq(product_id)]
+    selected_week = pd.Timestamp(week)
+    selected = trajectory.loc[trajectory.Order_Date.eq(selected_week)].copy()
+    if len(selected) != 1:
+        raise ValueError("selected investigation record is unavailable or ambiguous")
+    pool = capacity.loc[capacity.Plant_ID.eq(plant_id) & capacity.Order_Date.eq(selected_week)].copy()
+    if len(pool) != 1:
+        raise ValueError("selected plant-week capacity pool is unavailable or ambiguous")
+    peers = source.loc[source.Plant_ID.eq(plant_id) & source.Order_Date.eq(selected_week)].sort_values(
+        "Allocation_Order", kind="mergesort"
+    )
+    # Reuse Phase 2 observations, isolated to one run before its plant-week join.
+    signals = risk_driver_details(peers, pool)
+    signals = signals.loc[signals["Product Card Id"].eq(product_id)].copy()
+    signals["Run_ID"] = run_id
+    adjacent = trajectory.loc[trajectory.Order_Date.between(
+        selected_week - pd.Timedelta(weeks=1), selected_week + pd.Timedelta(weeks=1)
+    )].sort_values("Order_Date", kind="mergesort")
+    return {"selected_week": selected, "shared_capacity": pool,
+            "allocation_peers": peers.copy(), "adjacent_weeks": adjacent.copy(),
+            "observed_signals": signals}
+
+
+def filter_investigation_evidence(
+    frame: pd.DataFrame, *, run_id: str, scenario: str, plant_id: str,
+    product_id: str, week: object,
+) -> pd.DataFrame:
+    """Filter one independently displayed artifact at its native grain.
+
+    Caller validates the artifact schema. Scenario-independent inputs stay
+    scenario-independent; no source rows are manufactured for scenario demand.
+    """
+    _require_columns(frame, ["Run_ID", "Schema_Version"], "investigation evidence")
+    result = frame.loc[frame.Run_ID.eq(run_id)].copy()
+    for column, value in [("Scenario", scenario), ("Plant_ID", plant_id),
+                          ("Product Card Id", product_id)]:
+        if column in result:
+            result = result.loc[result[column].eq(value)]
+    if "Order_Date" in result:
+        dates = pd.to_datetime(result.Order_Date, errors="raise")
+        result = result.loc[dates.eq(pd.Timestamp(week))].copy()
+    if "Aggregation_Level" in result:
+        result = result.loc[result.Aggregation_Level.eq("Scenario × Plant × Week")].copy()
+    return result.reset_index(drop=True)
+
+
+def investigation_evidence_csv(frame: pd.DataFrame, selection: dict[str, object],
+                               artifact: str) -> str:
+    """Export native evidence plus explicit investigation context, without joins."""
+    result = frame.copy(deep=True)
+    result.insert(0, "Evidence_Artifact", artifact)
+    for field in reversed(INVESTIGATION_KEY):
+        result.insert(0, "Investigation_" + field, selection[field])
+    return result.to_csv(index=False, date_format="%Y-%m-%d")

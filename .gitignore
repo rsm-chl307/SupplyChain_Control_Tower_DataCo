@@ -1,0 +1,16 @@
+# Repository temporary runs and browser acceptance artifacts
+/tmp/
+
+# Python generated files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local virtual environments
+.venv/
+venv/
+
+# Playwright conventional output directories
+/test-results/
+/playwright-report/
+/playwright/.cache/

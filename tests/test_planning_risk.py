@@ -8,6 +8,9 @@ from pathlib import Path
 import pandas as pd
 
 from src.planning_risk import (
+    filter_investigation_evidence,
+    investigation_evidence_csv,
+    investigation_views,
     plant_bottleneck_summary,
     product_risk_ranking,
     risk_driver_details,
@@ -311,6 +314,139 @@ class PlanningRiskTests(unittest.TestCase):
         self.assertFalse(changes.empty)
         self.assertNotIn("Bottleneck_Plant_Weeks_Change", changes.columns)
         self.assertTrue((changes.Demand_Fulfillment_Rate_Change < 0).all())
+
+
+class InvestigationTests(unittest.TestCase):
+    def setUp(self):
+        self.allocation = allocation_fixture().assign(Run_ID="run-1", Schema_Version="sequential_v1")
+        self.pools = pools_fixture().assign(Run_ID="run-1", Schema_Version="sequential_v1")
+        self.selection = dict(run_id="run-1", scenario="Baseline", plant_id="P1", product_id="SKU-A", week=WEEKS[0])
+
+    def test_selection_isolates_full_key_and_reconciles_peer_pool(self):
+        # Unrelated run values must not leak into Phase 2's pool join.
+        other = self.allocation.assign(Run_ID="run-2", Internal_Production_Qty=999)
+        other_pools = self.pools.assign(Run_ID="run-2", Allocated_Workload=999)
+        for scenario in ["Baseline", "Combined_Stress"]:
+            selection = dict(self.selection, scenario=scenario)
+            result = investigation_views(pd.concat([self.allocation, other]),
+                                         pd.concat([self.pools, other_pools]), **selection)
+            row = result["selected_week"].iloc[0]
+            self.assertEqual(len(result["selected_week"]), 1)
+            self.assertEqual((row.Run_ID, row.Scenario, row.Plant_ID, row["Product Card Id"], row.Order_Date),
+                             ("run-1", scenario, "P1", "SKU-A", WEEKS[0]))
+            self.assertEqual(len(result["shared_capacity"]), 1)
+            peers = result["allocation_peers"]
+            self.assertEqual(peers["Product Card Id"].tolist(), ["SKU-A", "001"])
+            self.assertEqual(peers.Allocation_Order.tolist(), [1, 2])
+            self.assertEqual(peers.Allocated_Workload.sum(), result["shared_capacity"].Allocated_Workload.iloc[0])
+            self.assertEqual(peers.Unmet_Workload.sum(), result["shared_capacity"].Unmet_Workload.iloc[0])
+            self.assertEqual(result["observed_signals"].Run_ID.iloc[0], "run-1")
+
+    def test_trajectory_preserves_inventory_backlog_and_input_frames(self):
+        before = self.allocation.copy(deep=True)
+        pools_before = self.pools.copy(deep=True)
+        result = investigation_views(self.allocation, self.pools, **self.selection)
+        expected = self.allocation.loc[self.allocation.Scenario.eq("Baseline") & self.allocation.Plant_ID.eq("P1")
+                                       & self.allocation["Product Card Id"].eq("SKU-A")].reset_index(drop=True)
+        pd.testing.assert_frame_equal(result["adjacent_weeks"].reset_index(drop=True), expected)
+        again = investigation_views(self.allocation.sample(frac=1, random_state=7), self.pools, **self.selection)
+        for name in result:
+            pd.testing.assert_frame_equal(result[name].reset_index(drop=True), again[name].reset_index(drop=True))
+        pd.testing.assert_frame_equal(self.allocation, before)
+        pd.testing.assert_frame_equal(self.pools, pools_before)
+
+    def test_missing_duplicate_and_wrong_week_are_explicit(self):
+        for changes in [{"run_id": "missing"}, {"product_id": "missing"}, {"plant_id": "P2", "product_id": "001"},
+                        {"week": "2030-01-06"}]:
+            with self.assertRaisesRegex(ValueError, "unavailable"):
+                investigation_views(self.allocation, self.pools, **dict(self.selection, **changes))
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            investigation_views(pd.concat([self.allocation, self.allocation.iloc[[0]]]), self.pools, **self.selection)
+        with self.assertRaisesRegex(ValueError, "pool.*unavailable"):
+            investigation_views(self.allocation, self.pools.iloc[1:], **self.selection)
+
+    def test_evidence_retains_multiple_source_rows_without_inflating_outcomes_and_exports_context(self):
+        import io
+
+        evidence = pd.DataFrame({"Run_ID": ["run-1"] * 3 + ["run-2"], "Schema_Version": ["sequential_v1"] * 4,
+                                 "Plant_ID": ["P1"] * 4, "Product Card Id": ["SKU-A"] * 4,
+                                 "Order_Date": [WEEKS[0]] * 2 + [WEEKS[1], WEEKS[0]],
+                                 "Receipt_ID": ["001", "NA", "later", "other"], "External_Receipts_Qty": [2, 3, 10, 999]})
+        selected = filter_investigation_evidence(evidence, **self.selection)
+        self.assertEqual(selected.Receipt_ID.tolist(), ["001", "NA"])
+        self.assertEqual(selected.External_Receipts_Qty.sum(), 5)
+        view = investigation_views(self.allocation, self.pools, **self.selection)
+        self.assertEqual(len(view["selected_week"]), 1)
+        key = dict(zip(["Run_ID", "Scenario", "Plant_ID", "Product Card Id", "Order_Date"],
+                       ["run-1", "Baseline", "P1", "SKU-A", WEEKS[0]]))
+        export = pd.read_csv(io.StringIO(investigation_evidence_csv(selected, key, "external_receipts")),
+                             dtype=str, keep_default_na=False)
+        self.assertEqual(export.Receipt_ID.tolist(), ["001", "NA"])
+        self.assertEqual(export.Investigation_Order_Date.tolist(), ["2026-01-04"] * 2)
+        self.assertEqual(export.Investigation_Scenario.tolist(), ["Baseline"] * 2)
+        self.assertNotIn("Scenario", selected)  # Context must not fabricate a native scenario.
+        empty = selected.iloc[:0]
+        self.assertTrue(filter_investigation_evidence(empty, **self.selection).empty)
+        self.assertIn("Investigation_Run_ID", investigation_evidence_csv(empty, key, "external_receipts"))
+
+    def test_zero_capacity_zero_demand_inventory_receipts_and_backlog_observations(self):
+        for demand, capacity, inventory, receipts, backlog, policy in [
+            (4, 0, 0, 0, 0, "CARRY_FORWARD"), (0, 0, 0, 0, 0, "CARRY_FORWARD"),
+            (4, 0, 4, 0, 0, "CARRY_FORWARD"), (4, 0, 0, 4, 0, "CARRY_FORWARD"),
+            (4, 0, 0, 0, 2, "CARRY_FORWARD"), (4, 0, 0, 0, 0, "LOST_SALES"),
+        ]:
+            from src.inventory_engine import transition_inventory
+
+            row = self.allocation.iloc[[0]].copy()
+            row["Scenario_Qualified_Demand"] = demand
+            row["Beginning_Inventory"] = inventory
+            row["Beginning_Backlog"] = backlog
+            row["External_Receipts_Qty"] = receipts
+            row["Internal_Production_Qty"] = 0
+            row["Required_Production_Qty"] = max(backlog + demand - inventory - receipts, 0)
+            row["Allocated_Workload"] = 0
+            row["Unmet_Workload"] = row.Required_Production_Qty
+            row["Unmet_Production_Qty"] = row.Required_Production_Qty
+            row["Backlog_Policy"] = policy
+            values = transition_inventory(beginning_inventory=inventory, beginning_backlog=backlog,
+                                          current_demand=demand, external_receipts=receipts,
+                                          internal_production=0, backlog_policy=policy, opening_origin_backlog=backlog)
+            for field, value in values.items():
+                row[field] = value
+            pool = self.pools.iloc[[0]].copy()
+            pool["Available_Workload_Capacity"] = capacity
+            pool["Allocated_Workload"] = 0
+            pool["Remaining_Workload_Capacity"] = 0
+            pool["Unmet_Workload"] = row.Unmet_Workload.iloc[0]
+            views = investigation_views(row, pool, **self.selection)
+            pd.testing.assert_frame_equal(views["selected_week"], row)
+            self.assertEqual(len(views["shared_capacity"]), 1)
+            self.assertEqual(views["selected_week"].Current_Unfulfilled_Qty.iloc[0], values["Current_Unfulfilled_Qty"])
+
+    def test_both_published_modes_all_keys_and_kpi_grain(self):
+        from dashboard.scenario_planning_app import load_sequential_outputs
+
+        with tempfile.TemporaryDirectory() as temporary:
+            for mode in ["synthetic_demo", "user_data"]:
+                directory = EXAMPLES / mode
+                config = json.loads((directory / "config.json").read_text())
+                paths = run_csv_planning(config, inputs_dir=directory, output_root=temporary)
+                tables = load_sequential_outputs(paths["run_manifest"].parent, include_evidence=True)
+                for scenario in ["Baseline", "Combined_Stress"]:
+                    for _, row in tables["allocation"].loc[tables["allocation"].Scenario.eq(scenario)].iterrows():
+                        selection = dict(run_id=row.Run_ID, scenario=row.Scenario, plant_id=row.Plant_ID,
+                                         product_id=row["Product Card Id"], week=row.Order_Date)
+                        views = investigation_views(tables["allocation"], tables["pools"], **selection)
+                        peers, pool = views["allocation_peers"], views["shared_capacity"].iloc[0]
+                        self.assertAlmostEqual(peers.Allocated_Workload.sum(), pool.Allocated_Workload)
+                        self.assertAlmostEqual(peers.Unmet_Workload.sum(), pool.Unmet_Workload)
+                        self.assertEqual(len(views["selected_week"]), 1)
+                        kpis = filter_investigation_evidence(tables["performance"], **selection)
+                        self.assertEqual(len(kpis), 1)
+                        self.assertEqual(kpis.Aggregation_Level.iloc[0], "Scenario × Plant × Week")
+                        for name in ["eligibility_ledger", "external_receipts", "initial_state", "workload_factors"]:
+                            evidence = filter_investigation_evidence(tables[name], **selection)
+                            self.assertTrue(evidence.Run_ID.eq(row.Run_ID).all())
 
 
 if __name__ == "__main__":

@@ -380,3 +380,7 @@ The runner does not implement UI or Power BI behavior. Future dashboard controls
 ## Dashboard Integration MVP Implementation Record
 
 The approved MVP presentation layer is implemented as `dashboard/scenario_planning_app.py` using Streamlit and Plotly. It adds Scenario Overview, Scenario Comparison, and Capacity Allocation Detail views without modifying the existing `dashboard/supply_chain_control_tower.pbix`. User controls pass planning horizon and approved scenario parameters to `src/run_planning.py`; prepared performance, allocation, and scenario outputs are loaded for display.
+
+## Phase 3 WP2 current implementation addendum — 2026-11-18
+
+The sequential Streamlit view now includes Scenario Trade-off Analysis alongside its existing views. Explicit Reference/Candidate selection, fixed reference-priority cohort membership, ALL/SELECTED/COMPLEMENT metrics, metric-level comparability, native evidence references and comparison CSV downloads follow the [WP2 v1.0 specification](../wp2_scenario_tradeoff_analysis_specification.md). Users can open a chosen comparison side/product in the existing WP1 Root Cause Investigation. This additive tab does not change the historical PBIX page mapping, upload workflow or core metric formulas. Implementation/validation records: [WP2 progress](../wp2_implementation_progress.md).

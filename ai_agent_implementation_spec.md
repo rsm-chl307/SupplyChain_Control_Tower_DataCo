@@ -956,3 +956,9 @@ Decision Support
 ```
 
 The implementation should remain simple, explainable, and business-oriented.
+
+## Phase 3 WP2 implementation addendum — 2026-11-18
+
+The separately authorized Phase 3 Scenario Trade-off Analysis uses the complete [WP2 Implementation Specification v1.0](docs/wp2_scenario_tradeoff_analysis_specification.md). [Stage gates and final acceptance](docs/wp2_implementation_progress.md) are the implementation audit record. This is distinct from historical Route B WP2 Demand/Capacity.
+
+The new comparison interface consumes two explicit scenarios in one published sequential_v1 run, uses fixed reference-priority cohorts and complementary groups, preserves native metric grains and evidence lineage, and labels policy/input contrasts without recommendations. The Streamlit tab and CSV exports consume the shared pure comparison result. Existing planning, allocation, inventory and KPI formulas remain frozen; no WP3/WP4 functionality is introduced.

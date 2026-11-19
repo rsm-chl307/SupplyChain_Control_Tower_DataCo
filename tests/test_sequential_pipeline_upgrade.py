@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from dashboard.scenario_planning_app import load_sequential_outputs
+from dashboard.scenario_planning_app import investigation_source_status, load_sequential_outputs
 from src.run_planning import run_sequential_planning
 from src.sequential_planner import ALLOCATION_POLICY
 
@@ -125,6 +125,70 @@ class SequentialPipelineUpgradeTests(unittest.TestCase):
         tables = load_sequential_outputs(self.execute()["run_manifest"].parent)
         self.assertTrue(tables["allocation"].Ending_Backlog.eq(0).all())
         self.assertGreater(tables["allocation"].Lost_Sales_Qty.sum(), 0)
+
+
+    def rewrite_artifact(self, outputs, name, frame):
+        from hashlib import sha256
+
+        frame.to_csv(outputs[name], index=False)
+        manifest = json.loads(outputs["run_manifest"].read_text())
+        manifest["Artifacts"][name]["SHA256"] = sha256(outputs[name].read_bytes()).hexdigest()
+        manifest["Artifacts"][name]["Rows"] = len(frame)
+        outputs["run_manifest"].write_text(json.dumps(manifest))
+
+    def test_additional_evidence_loads_optional_empty_receipts_and_string_source_ids(self):
+        outputs = self.execute()
+        tables = load_sequential_outputs(outputs["run_manifest"].parent, include_evidence=True)
+        self.assertTrue(tables["external_receipts"].empty)
+        self.assertIn("Receipt_ID", tables["external_receipts"])
+        self.assertEqual(tables["eligibility_ledger"]["Order Item Id"].iloc[0], "1")
+        ledger = tables["eligibility_ledger"].copy()
+        ledger.loc[0, "Order Item Id"] = "001"
+        ledger.loc[1, "Product Card Id"] = "NA"
+        self.rewrite_artifact(outputs, "eligibility_ledger", ledger)
+        loaded = load_sequential_outputs(outputs["run_manifest"].parent, include_evidence=True)
+        self.assertEqual(loaded["eligibility_ledger"]["Order Item Id"].iloc[0], "001")
+        self.assertEqual(loaded["eligibility_ledger"]["Product Card Id"].iloc[1], "NA")
+
+    def test_evidence_identity_schema_numeric_and_date_validation(self):
+        for defect in ["identity", "schema", "numeric", "date"]:
+            outputs = self.execute()
+            ledger = pd.read_csv(outputs["eligibility_ledger"])
+            if defect == "identity":
+                ledger.loc[0, "Run_ID"] = "another-run"
+            elif defect == "schema":
+                ledger = ledger.drop(columns="Plant_ID")
+            elif defect == "numeric":
+                ledger.loc[0, "Qualified_Demand"] = float("nan")
+            else:
+                ledger.loc[0, "Order_Date"] = "invalid-week"
+            self.rewrite_artifact(outputs, "eligibility_ledger", ledger)
+            with self.assertRaises(ValueError, msg=defect):
+                load_sequential_outputs(outputs["run_manifest"].parent, include_evidence=True)
+
+    def test_additional_evidence_hash_and_missing_artifacts_are_rejected(self):
+        outputs = self.execute()
+        outputs["external_receipts"].write_text("tampered")
+        with self.assertRaisesRegex(ValueError, "hash mismatch: external_receipts"):
+            load_sequential_outputs(outputs["run_manifest"].parent, include_evidence=True)
+        outputs = self.execute()
+        # Move a fixture artifact, leaving all user/repository files untouched.
+        outputs["eligibility_ledger"].rename(outputs["eligibility_ledger"].with_suffix(".missing"))
+        with self.assertRaisesRegex(ValueError, "missing or hash mismatch"):
+            load_sequential_outputs(outputs["run_manifest"].parent, include_evidence=True)
+
+    def test_original_source_availability_does_not_replace_published_evidence(self):
+        outputs = self.execute()
+        manifest = json.loads(outputs["run_manifest"].read_text())
+        statuses = investigation_source_status(manifest)
+        self.assertTrue(statuses.Source_Status.str.startswith("Available").all())
+        orders = self.root / "raw/orders.csv"
+        orders.write_text("changed source")
+        self.assertTrue(investigation_source_status(manifest).Source_Status.str.startswith("Invalid").any())
+        orders.rename(orders.with_suffix(".unavailable"))
+        self.assertTrue(investigation_source_status(manifest).Source_Status.str.startswith("Unavailable").any())
+        loaded = load_sequential_outputs(outputs["run_manifest"].parent, include_evidence=True)
+        self.assertFalse(loaded["eligibility_ledger"].empty)
 
 
 if __name__ == "__main__":

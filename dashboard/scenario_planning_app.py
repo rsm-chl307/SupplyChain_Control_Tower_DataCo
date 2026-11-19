@@ -29,9 +29,11 @@ if str(REPOSITORY_ROOT) not in sys.path:
 
 from src.run_planning import PlanningRunError, run_csv_planning, run_planning, run_sequential_planning
 from src.planning_risk import (
+    filter_investigation_evidence,
+    investigation_evidence_csv,
+    investigation_views,
     plant_bottleneck_summary,
     product_risk_ranking,
-    risk_driver_details,
     scenario_plant_deterioration,
     scenario_product_deterioration,
     scenario_risk_comparison,
@@ -811,18 +813,97 @@ def _user_csv_upload_workflow() -> None:
                 _render_readiness_report(exc.report)
 
 
-def load_sequential_outputs(output_dir: str | Path) -> dict[str, pd.DataFrame]:
+# Evidence stays at its published grain; receipts may legitimately have no rows.
+INVESTIGATION_EVIDENCE_COLUMNS = {
+    "eligibility_ledger": ["Plant_ID", "Product Card Id", "Order_Date", "Gross_Demand",
+                           "Qualified_Demand", "Excluded_Demand", "Is_Qualified", "Exclusion_Reason"],
+    "weekly_demand": ["Plant_ID", "Product Card Id", "Order_Date", "Qualified_Demand", "Coverage_Status"],
+    "demand_coverage": ["Plant_ID", "Product Card Id", "Order_Date", "Coverage_Status"],
+    "initial_state": ["Plant_ID", "Product Card Id", "Beginning_Inventory", "Beginning_Backlog"],
+    "external_receipts": ["Receipt_ID", "Plant_ID", "Product Card Id", "Order_Date", "External_Receipts_Qty"],
+    "workload_factors": ["Product Card Id", "Workload_Factor", "Workload_Unit", "Factor_Version"],
+    "capacity_baseline": ["Plant_ID", "Baseline_Workload_Capacity"],
+    "validation_result": ["Check_ID", "Message", "Passed", "Rows_Checked"],
+}
+
+
+def investigation_source_status(manifest: dict) -> pd.DataFrame:
+    """Report source availability/integrity without using source files as results."""
+    from hashlib import sha256
+
+    hashes = manifest.get("Source_Hashes", {})
+    sources = manifest.get("Input_Validation", {}).get("Sources", [])
+    if not sources:
+        sources = [{"Dataset": "source", "Path": path} for path in hashes]
+    rows = []
+    for source in sources:
+        row = dict(source)
+        path = Path(source.get("Path", ""))
+        expected = hashes.get(str(path))
+        row["Source_SHA256"] = expected or "Unavailable"
+        try:
+            if not source.get("Path") or not path.is_file():
+                status = "Unavailable: original source file is missing"
+            elif not expected:
+                status = "Unavailable: no recorded source hash"
+            elif sha256(path.read_bytes()).hexdigest() != expected:
+                status = "Invalid: original source hash mismatch"
+            else:
+                status = "Available: source hash matches"
+        except OSError:
+            status = "Unavailable: original source cannot be read"
+        row["Source_Status"] = status
+        # Mappings are descriptive JSON rather than an object-valued table cell.
+        if "Column_Mapping" in row:
+            row["Column_Mapping"] = json.dumps(row["Column_Mapping"], ensure_ascii=False)
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def load_sequential_outputs(output_dir: str | Path, *, include_evidence: bool = False) -> dict[str, pd.DataFrame]:
     """Verify a complete published run and load a consistent new-schema bundle."""
     import json
     from hashlib import sha256
 
     directory = Path(output_dir).resolve()
     manifest = json.loads((directory / "run_manifest.json").read_text())
+    if not isinstance(manifest, dict):
+        raise ValueError("sequential manifest must be a JSON object")
+    if not isinstance(manifest.get("Run_ID"), str) or not manifest["Run_ID"].strip():
+        raise ValueError("manifest Run_ID must be a nonempty string")
     if (manifest.get("Schema_Version") != "sequential_v1"
             or manifest.get("Execution_Status") != "SUCCEEDED"
             or manifest.get("Validation_Status") != "PASSED"
             or manifest.get("Publication_Status") != "PUBLISHED"):
         raise ValueError("sequential run is incomplete, failed or unpublished")
+    artifacts = manifest.get("Artifacts")
+    if not isinstance(artifacts, dict):
+        raise ValueError("manifest Artifacts must be an object")
+    for name, artifact in artifacts.items():
+        if (not isinstance(artifact, dict)
+                or not isinstance(artifact.get("Path"), str)
+                or not isinstance(artifact.get("SHA256"), str)):
+            raise ValueError(f"manifest artifact {name}: object with Path and SHA256 strings required")
+    configuration = manifest.get("Configuration")
+    if not isinstance(configuration, dict):
+        raise ValueError("manifest Configuration must be an object")
+    scenarios = configuration.get("scenarios")
+    if (not isinstance(scenarios, list) or not scenarios
+            or any(not isinstance(item, dict) or not isinstance(item.get("Scenario"), str)
+                   or not item["Scenario"].strip() for item in scenarios)):
+        raise ValueError("manifest Configuration.scenarios must be a list of scenario objects")
+    for field in ("assumption_version", "planning_interpretation"):
+        if not isinstance(configuration.get(field), str):
+            raise ValueError(f"manifest Configuration.{field} must be a string")
+    scope = manifest.get("Scope")
+    if not isinstance(scope, dict):
+        raise ValueError("manifest Scope must be an object")
+    bounds = scope.get("Planning_Horizon")
+    if not isinstance(bounds, list) or len(bounds) != 2 or not all(isinstance(v, str) for v in bounds):
+        raise ValueError("manifest Scope.Planning_Horizon must contain two date strings")
+    products = scope.get("Product_IDs")
+    if not isinstance(products, list) or not products:
+        raise ValueError("manifest Scope.Product_IDs must be a nonempty list")
     required = {"eligibility_ledger", "weekly_demand", "demand_coverage", "initial_state",
                 "external_receipts", "workload_factors", "capacity_baseline",
                 "scenario_snapshot", "capacity_pools", "allocation_result",
@@ -835,13 +916,37 @@ def load_sequential_outputs(output_dir: str | Path) -> dict[str, pd.DataFrame]:
             raise ValueError(f"artifact missing or hash mismatch: {name}")
     names = {"performance": "performance_result", "allocation": "allocation_result",
              "pools": "capacity_pools", "scenario": "scenario_snapshot"}
+    if include_evidence:
+        names.update({name: name for name in sorted(required - set(names.values()))})
     outputs = {}
     for name, artifact_name in names.items():
-        frame = pd.read_csv(directory / manifest["Artifacts"][artifact_name]["Path"], parse_dates=["Order_Date"], converters={name: str for name in ["Product Card Id", "Plant_ID", "Scenario", "Run_ID", "Schema_Version", "Product Name", "Factor_Version", "Workload_Unit"]})
-        if frame.empty:
+        path = directory / manifest["Artifacts"][artifact_name]["Path"]
+        header = pd.read_csv(path, nrows=0)
+        identifiers = ["Product Card Id", "Plant_ID", "Scenario", "Run_ID", "Schema_Version",
+                       "Product Name", "Factor_Version", "Workload_Unit", "Order Item Id",
+                       "Source_Record_ID", "Receipt_ID", "Order Status", "Status", "Quantity_Unit"]
+        identifiers.extend(column for column in header if column.endswith("_Version"))
+        frame = pd.read_csv(path, parse_dates=["Order_Date"] if "Order_Date" in header else [],
+                            converters={column: str for column in identifiers})
+        if frame.empty and artifact_name != "external_receipts":
             raise ValueError(f"published sequential artifact is empty: {artifact_name}")
-        if "Run_ID" not in frame or "Schema_Version" not in frame or set(frame.Run_ID) != {manifest["Run_ID"]} or set(frame.Schema_Version) != {"sequential_v1"}:
+        if "Run_ID" not in frame or "Schema_Version" not in frame or (not frame.empty and (set(frame.Run_ID) != {manifest["Run_ID"]} or set(frame.Schema_Version) != {"sequential_v1"})):
             raise ValueError(f"mixed or invalid sequential run identity: {artifact_name}")
+        if "Order_Date" in frame:
+            frame["Order_Date"] = pd.to_datetime(frame.Order_Date, errors="raise")
+            if artifact_name != "performance_result" and frame.Order_Date.isna().any():
+                raise ValueError(f"invalid evidence week: {artifact_name}")
+        if include_evidence and artifact_name in INVESTIGATION_EVIDENCE_COLUMNS:
+            missing = set(INVESTIGATION_EVIDENCE_COLUMNS[artifact_name]) - set(frame.columns)
+            if missing:
+                raise ValueError(f"investigation evidence schema mismatch: {artifact_name}: {', '.join(sorted(missing))}")
+            from src.planning_inputs import numeric
+
+            quantities = [column for column in ["Gross_Demand", "Qualified_Demand", "Excluded_Demand",
+                          "Beginning_Inventory", "Beginning_Backlog", "External_Receipts_Qty",
+                          "Workload_Factor", "Baseline_Workload_Capacity"] if column in frame]
+            if artifact_name != "demand_coverage":
+                numeric(frame, quantities)
         outputs[name] = frame
     required_allocation = {
         "Scenario", "Plant_ID", "Product Card Id", "Product Name", "Order_Date", "Planning_Priority",
@@ -866,12 +971,132 @@ def load_sequential_outputs(output_dir: str | Path) -> dict[str, pd.DataFrame]:
     return outputs
 
 
-def _planning_risk_summary(outputs: dict[str, pd.DataFrame], selected_scenario: str) -> None:
+def _investigation_select(label: str, values: list, key: str):
+    """Reset stale dependent selections after changing run/scenario/parent."""
+    if st.session_state.get(key) not in values:
+        st.session_state[key] = values[0]
+    return st.selectbox(label, values, key=key)
+
+
+def _root_cause_investigation(outputs: dict[str, pd.DataFrame], scenario: str,
+                             manifest: dict | None) -> None:
+    """Explore published observations; widget reruns never execute planning."""
+    st.caption("Simulation observations that occurred together, not validated causal attributions. "
+               "Product quantities and plant-week workload capacity have different units and grains.")
+    source = outputs["allocation"]
+    run_id = manifest["Run_ID"] if manifest else str(source.Run_ID.iloc[0])
+    source = source.loc[source.Run_ID.eq(run_id) & source.Scenario.eq(scenario)]
+    if source.empty:
+        st.info("No investigation records are available for this run and scenario.")
+        return
+    scope = (run_id, scenario)
+    if st.session_state.get("investigation_scope") != scope:
+        st.session_state["investigation_scope"] = scope
+        st.session_state.pop("investigation_entry", None)
+        for key in ["investigation_path", "investigation_product", "investigation_plant", "investigation_week"]:
+            st.session_state.pop(key, None)
+    entry = st.session_state.pop("investigation_entry", None)
+    if entry:
+        path, identifier = entry
+        st.session_state["investigation_path"] = path
+        st.session_state["investigation_product" if path.startswith("Product") else "investigation_plant"] = identifier
+    path = _investigation_select("Investigation path", ["Product → Plant → Week", "Plant → Week → Product"],
+                                 "investigation_path")
+    if path.startswith("Product"):
+        product = _investigation_select("Investigation product", sorted(source["Product Card Id"].unique()), "investigation_product")
+        product_rows = source.loc[source["Product Card Id"].eq(product)]
+        plant = _investigation_select("Investigation plant", sorted(product_rows.Plant_ID.unique()), "investigation_plant")
+        candidates = product_rows.loc[product_rows.Plant_ID.eq(plant)]
+        week = _investigation_select("Investigation week (Sunday ending)", sorted(candidates.Order_Date.unique()), "investigation_week")
+    else:
+        plant = _investigation_select("Investigation plant", sorted(source.Plant_ID.unique()), "investigation_plant")
+        plant_rows = source.loc[source.Plant_ID.eq(plant)]
+        week = _investigation_select("Investigation week (Sunday ending)", sorted(plant_rows.Order_Date.unique()), "investigation_week")
+        candidates = plant_rows.loc[plant_rows.Order_Date.eq(week)]
+        product = _investigation_select("Investigation product", sorted(candidates["Product Card Id"].unique()), "investigation_product")
+    selection = {"Run_ID": run_id, "Scenario": scenario, "Plant_ID": plant,
+                 "Product Card Id": product, "Order_Date": pd.Timestamp(week)}
+    try:
+        views = investigation_views(outputs["allocation"], outputs["pools"], run_id=run_id,
+                                    scenario=scenario, plant_id=plant, product_id=product, week=week)
+    except (KeyError, ValueError) as exc:
+        st.warning(f"Investigation unavailable: {exc}")
+        return
+    st.markdown("**Selected-week observations**")
+    st.caption(f"{run_id} · {scenario} · {plant} · {product} · {pd.Timestamp(week):%Y-%m-%d}")
+    selected = views["selected_week"]
+    st.caption(f"Product: {selected.iloc[0]['Product Name']}. These are published simulation outputs.")
+    st.dataframe(selected, hide_index=True, use_container_width=True)
+    st.markdown("**Shared plant-week capacity — counted once**")
+    st.caption("Unmet_Workload in this table is the entire plant-week pool; the selected product's Unmet_Workload is shown above.")
+    st.dataframe(views["shared_capacity"], hide_index=True, use_container_width=True)
+    st.markdown("**Observed together**")
+    st.write(views["observed_signals"].iloc[0].Risk_Signals)
+    st.markdown("**Adjacent-week product trajectory**")
+    st.caption("Previous, selected and next calendar week for this plant/product. Stocks and backlog are not summed across weeks.")
+    st.dataframe(views["adjacent_weeks"], hide_index=True, use_container_width=True)
+    st.markdown("**All products sharing the selected capacity pool**")
+    st.caption("Existing Allocation_Order is preserved. Priority and workload observations do not establish causal responsibility for another product's shortfall.")
+    st.dataframe(views["allocation_peers"], hide_index=True, use_container_width=True)
+    st.markdown("**Supporting Evidence**")
+    st.caption("Each artifact is filtered independently at its native grain. Investigation_* export columns describe your selection, "
+               "not the source record's grain. Scenario demand increments have no invented source orders. "
+               "Weekly csv-record identifiers identify input records, not business orders. Missing raw sources do not replace published evidence.")
+    evidence = dict(views)
+    for name in ["scenario", "performance", *INVESTIGATION_EVIDENCE_COLUMNS]:
+        if name not in outputs:
+            st.info(f"Supporting evidence unavailable: {name}")
+            continue
+        evidence[name] = filter_investigation_evidence(outputs[name], run_id=run_id, scenario=scenario,
+                                                       plant_id=plant, product_id=product, week=week)
+    notes = {
+        "initial_state": "Horizon opening state, not a weekly stock reset.",
+        "eligibility_ledger": "Scenario-independent source demand records. No matching records may reflect covered zero demand; inspect coverage.",
+        "external_receipts": "Scheduled supply usable in the selected week. No matching rows means no scheduled external receipts for this selection.",
+        "performance": "Published plant-week KPIs, not product-week KPIs. 0/0 ratios remain N/A; weekly fulfillment is the current-week cohort.",
+        "validation_result": "Run-level independent validation checks, not product-specific checks.",
+    }
+    if manifest:
+        st.caption(f"Data mode: {manifest.get('Data_Mode', 'Unavailable')} · "
+                   f"Interpretation: {manifest['Configuration'].get('planning_interpretation', 'Unavailable')}. "
+                   "USER_PROVIDED describes input origin, not independently verified fact. Synthetic classifications are assumptions/examples.")
+        evidence["source_status"] = investigation_source_status(manifest)
+        statuses = evidence["source_status"]
+        if not statuses.empty:
+            if statuses.Source_Status.str.startswith("Unavailable").any():
+                st.info("Some original source files are unavailable. Validated published evidence remains available; see source_status.")
+            if statuses.Source_Status.str.startswith("Invalid").any():
+                st.warning("Some original source hashes no longer match. Original files are not used as evidence; see source_status.")
+        with st.expander("Source provenance and assumptions"):
+            st.json({"Sources": manifest.get("Input_Validation", {}).get("Sources", []),
+                     "Assumptions": manifest.get("Input_Validation", {}).get("Assumptions", []),
+                     "Configuration": manifest["Configuration"], "Artifacts": manifest["Artifacts"]})
+    artifact_names = {"selected_week": "allocation_result.csv", "adjacent_weeks": "allocation_result.csv",
+                      "allocation_peers": "allocation_result.csv", "shared_capacity": "capacity_pools.csv",
+                      "observed_signals": "derived from allocation_result.csv + capacity_pools.csv",
+                      "scenario": "scenario_snapshot.csv", "performance": "performance_result.csv",
+                      "source_status": "run_manifest.json"}
+    for name, frame in evidence.items():
+        with st.expander(f"Evidence: {name}"):
+            artifact = artifact_names.get(name, name + ".csv")
+            st.caption(f"Source: {artifact}")
+            if name in notes:
+                st.caption(notes[name])
+            if frame.empty:
+                st.info("No scheduled external receipts for this selection." if name == "external_receipts"
+                        else "No matching published evidence rows; no records have been inferred.")
+            else:
+                st.dataframe(frame, hide_index=True, use_container_width=True)
+            st.download_button(f"Download {name} investigation evidence", investigation_evidence_csv(frame, selection, artifact),
+                               file_name=f"investigation_{name}.csv", mime="text/csv", key=f"evidence_download_{name}")
+
+
+def _planning_risk_summary(outputs: dict[str, pd.DataFrame], selected_scenario: str,
+                           manifest: dict | None = None) -> None:
     """Render risk views from the already-published result artifacts."""
     try:
         product_risks = product_risk_ranking(outputs["allocation"])
         plants = plant_bottleneck_summary(outputs["pools"])
-        drivers = risk_driver_details(outputs["allocation"], outputs["pools"])
         scenario_comparison = scenario_risk_comparison(outputs["performance"])
     except (KeyError, ValueError) as exc:
         st.warning(f"Planning risk summary is unavailable for this run: {exc}")
@@ -881,7 +1106,7 @@ def _planning_risk_summary(outputs: dict[str, pd.DataFrame], selected_scenario: 
         return
 
     product_tab, plant_tab, driver_tab, scenario_tab = st.tabs(
-        ["Product Risk", "Plant Bottlenecks", "Risk Drivers", "Scenario Risk"]
+        ["Product Risk", "Plant Bottlenecks", "Root Cause Investigation", "Scenario Risk"]
     )
     current_products = product_risks[product_risks.Scenario.eq(selected_scenario)].copy()
     with product_tab:
@@ -901,6 +1126,8 @@ def _planning_risk_summary(outputs: dict[str, pd.DataFrame], selected_scenario: 
                 rendered = "N/A" if pd.isna(value) else (f"{value:.1%}" if column.endswith("Rate") else f"{value:,.2f}")
                 card.metric(column.replace("_", " "), rendered)
             st.caption(detail.Risk_Reason)
+            if st.button("Investigate product", key="investigate_product"):
+                st.session_state["investigation_entry"] = ("Product → Plant → Week", selected_product)
 
     current_plants = plants[plants.Scenario.eq(selected_scenario)].copy()
     with plant_tab:
@@ -908,6 +1135,8 @@ def _planning_risk_summary(outputs: dict[str, pd.DataFrame], selected_scenario: 
         plant_ids = current_plants.Plant_ID.astype(str).tolist()
         if plant_ids:
             selected_plant = st.selectbox("Plant drill-down", plant_ids, key=f"risk_plant_{selected_scenario}")
+            if st.button("Investigate plant", key="investigate_plant"):
+                st.session_state["investigation_entry"] = ("Plant → Week → Product", selected_plant)
             weekly = outputs["pools"].loc[
                 outputs["pools"].Scenario.eq(selected_scenario)
                 & outputs["pools"].Plant_ID.astype(str).eq(selected_plant)
@@ -933,38 +1162,8 @@ def _planning_risk_summary(outputs: dict[str, pd.DataFrame], selected_scenario: 
             st.markdown("**Products associated with this plant's workload pressure**")
             st.dataframe(contributors, hide_index=True, use_container_width=True)
 
-    current_drivers = drivers[drivers.Scenario.eq(selected_scenario)].copy()
     with driver_tab:
-        st.caption("Signals show conditions observed in the same product/plant/week. They are not validated causal attributions. Workload factors and capacity baselines retain the run's declared provenance and assumptions.")
-        products = current_drivers[["Product Card Id", "Product Name"]].drop_duplicates().sort_values("Product Name")
-        if not products.empty:
-            selected_product = st.selectbox(
-                "Product whose risk signals to inspect", products["Product Card Id"].astype(str).tolist(),
-                key=f"risk_driver_product_{selected_scenario}",
-            )
-            selected_rows = current_drivers[
-                current_drivers["Product Card Id"].astype(str).eq(selected_product)
-            ].sort_values(["Order_Date", "Plant_ID", "Allocation_Order"])
-            driver_columns = ["Order_Date", "Plant_ID", "Product Card Id", "Planning_Priority", "Allocation_Order",
-                              "Scenario_Qualified_Demand", "Incremental_Demand", "Beginning_Inventory", "Beginning_Backlog",
-                              "Workload_Factor", "Workload_Unit", "Required_Production_Qty", "Internal_Production_Qty",
-                              "Unmet_Production_Qty", "Product_Allocated_Workload", "Product_Unmet_Workload",
-                              "Available_Workload_Capacity", "Plant_Week_Allocated_Workload", "Remaining_Workload_Capacity",
-                              "Plant_Week_Unmet_Workload", "Plant_Week_Capacity_Utilization",
-                              "Capacity_Reduction_From_Baseline", "Ending_Backlog", "Lost_Sales_Qty", "Risk_Signals"]
-            st.dataframe(selected_rows[driver_columns], hide_index=True, use_container_width=True)
-            constrained = selected_rows[selected_rows.Plant_Week_Unmet_Workload.gt(1e-9)]
-            if not constrained.empty:
-                pressure = constrained.sort_values(["Plant_Week_Unmet_Workload", "Order_Date"],
-                                                   ascending=[False, True]).iloc[0]
-                peers = current_drivers[
-                    current_drivers.Plant_ID.eq(pressure.Plant_ID)
-                    & current_drivers.Order_Date.eq(pressure.Order_Date)
-                ].sort_values("Allocation_Order")
-                st.markdown(f"**Priority allocation context: {pressure.Plant_ID}, {pressure.Order_Date:%Y-%m-%d}**")
-                st.dataframe(peers[["Product Name", "Product Card Id", "Planning_Priority", "Allocation_Order",
-                                    "Required_Production_Qty", "Internal_Production_Qty", "Product_Unmet_Workload",
-                                    "Product_Allocated_Workload", "Risk_Signals"]], hide_index=True, use_container_width=True)
+        _root_cause_investigation(outputs, selected_scenario, manifest)
 
     with scenario_tab:
         st.caption("Deltas are descriptive comparisons to Baseline. Backlog_Policy is shown because policy changes also affect service, backlog, and lost-sales outcomes.")
@@ -991,6 +1190,113 @@ def _planning_risk_summary(outputs: dict[str, pd.DataFrame], selected_scenario: 
                     plant_change_columns.insert(6, "Bottleneck_Plant_Weeks_Change")
                 st.dataframe(plant_changes[plant_change_columns].head(10),
                              hide_index=True, use_container_width=True)
+
+
+def _comparison_investigation_entry(run_id: str, scenario: str, product: str) -> None:
+    """Seed the existing WP1 navigation using an explicitly chosen comparison side."""
+    st.session_state["sequential_scenario"] = scenario
+    st.session_state["investigation_scope"] = (run_id, scenario)
+    for key in ["investigation_path", "investigation_product", "investigation_plant", "investigation_week"]:
+        st.session_state.pop(key, None)
+    st.session_state["investigation_entry"] = ("Product → Plant → Week", product)
+
+
+def _comparison_display(frame: pd.DataFrame) -> pd.DataFrame:
+    """Make unavailable comparison values explicit without altering numeric results."""
+    result = frame.copy(deep=True)
+    for column in result:
+        if result[column].isna().any():
+            result[column] = result[column].map(
+                lambda value: "N/A" if pd.isna(value) else str(value))
+    return result
+
+
+def _scenario_tradeoff_analysis(run_dir: Path, manifest: dict) -> None:
+    """Render WP2 from the pure comparison API; no planning is executed here."""
+    from src.comparison_io import comparison_csv_exports, load_comparison_input
+    from src.scenario_comparison import ComparisonInput, ComparisonScope, compare_published_results
+
+    st.subheader("Scenario Trade-off Analysis")
+    st.caption("Delta = Candidate − Reference. Service deltas are percentage points; rate values are fractions. "
+               "These comparisons describe modeled outcomes and do not select a preferred action.")
+    scenarios = sorted(d["Scenario"] for d in manifest["Configuration"]["scenarios"])
+    if st.session_state.get("wp2_run") != manifest["Run_ID"]:
+        st.session_state["wp2_run"] = manifest["Run_ID"]
+        # Explicit assignments synchronize the browser as well as server state.
+        for key in ["wp2_reference", "wp2_candidate", "wp2_product"]:
+            st.session_state[key] = None
+        st.session_state["wp2_priorities"] = []
+    if st.session_state.get("wp2_reference") not in scenarios:
+        st.session_state["wp2_reference"] = None
+    reference = st.selectbox("Reference Scenario", scenarios, index=None,
+                             placeholder="Select Reference explicitly", key="wp2_reference")
+    candidates = [s for s in scenarios if s != reference]
+    if st.session_state.get("wp2_candidate") not in candidates:
+        # Explicit state assignment also clears the browser's displayed value.
+        st.session_state["wp2_candidate"] = None
+    candidate = st.selectbox("Candidate Scenario", candidates, index=None,
+                             placeholder="Select Candidate explicitly", key="wp2_candidate")
+    priorities = st.multiselect("Reference priorities (fixed cohort)", [1, 2, 3],
+                               format_func=lambda p: f"Priority {p}", key="wp2_priorities")
+    st.caption("Selected reference priorities: " + (", ".join(map(str, sorted(priorities))) if priorities else
+                                                  "None — SELECTED is empty / N/A"))
+    if reference is None or candidate is None:
+        st.info("Select both Reference and Candidate. No scenario is chosen as the comparison baseline automatically.")
+        return
+    try:
+        a = load_comparison_input(run_dir, reference)
+        b = ComparisonInput(a.manifest, a.tables, candidate)
+        bounds = manifest["Scope"]["Planning_Horizon"]
+        scope = ComparisonScope(tuple(str(p) for p in manifest["Scope"]["Product_IDs"]),
+                                tuple(sorted(a.tables["initial_state"].Plant_ID.unique())),
+                                bounds[0], bounds[1], tuple(sorted(priorities)))
+        result = compare_published_results(a, b, scope)
+    except (ValueError, KeyError, TypeError, OSError) as exc:
+        st.error(f"Scenario comparison unavailable: {exc}")
+        return
+    st.markdown("**Reference / Candidate context and complete planning scope**")
+    st.json({k: v for k, v in result.context.items() if k != "Plant_Capacity_Pool_Context"})
+    if result.context['Policy_Comparison'] == 'POLICY_CONTRAST':
+        st.warning("POLICY_CONTRAST — descriptive comparison only. LOST_SALES backlog = 0 does not mean "
+                   "improved service. Backlog and lost sales remain separate.")
+    if result.context['Input_Differences']:
+        st.info("Changed conditioning inputs: " + "; ".join(result.context['Input_Differences']))
+    st.metric("Priority Changed Product Count", result.context['Priority_Changed_Product_Count'])
+    st.markdown("**Fixed reference cohort membership**")
+    st.dataframe(_comparison_display(result.cohort_membership), hide_index=True, use_container_width=True)
+    st.markdown("**Priority changes**")
+    st.dataframe(_comparison_display(result.cohort_membership.loc[
+        result.cohort_membership['Priority Changed'].eq(True)]), hide_index=True, use_container_width=True)
+    summary_metrics = ["Horizon_Service_Level", "Terminal_Backlog", "Lost_Sales", "Allocated_Workload", "Unmet_Workload"]
+    st.markdown("**Trade-off summary — ALL / SELECTED / COMPLEMENT**")
+    summary = result.metrics.loc[result.metrics.Metric_ID.isin(summary_metrics)]
+    st.dataframe(_comparison_display(summary), hide_index=True, use_container_width=True)
+    for group, label in [("ALL", "All Products"), ("SELECTED", "Selected Cohort"), ("COMPLEMENT", "Complement")]:
+        with st.expander(label):
+            st.dataframe(_comparison_display(result.metrics.loc[result.metrics.Cohort_ID.eq(group)]),
+                         hide_index=True, use_container_width=True)
+    with st.expander("Metric-level comparability reasons"):
+        st.dataframe(_comparison_display(result.metrics[["Cohort_ID", "Metric_ID", "Order_Date",
+                                                       "Comparability_Status", "Reason"]]),
+                     hide_index=True, use_container_width=True)
+    with st.expander("Shared plant capacity pool context — counted once"):
+        st.caption("Shared plant-week capacity belongs to all competing products. It is not cohort capacity.")
+        st.dataframe(_comparison_display(pd.DataFrame(result.context['Plant_Capacity_Pool_Context'])),
+                     hide_index=True, use_container_width=True)
+    with st.expander("Comparison evidence references"):
+        st.dataframe(result.evidence_refs, hide_index=True, use_container_width=True)
+    exports = comparison_csv_exports(result)
+    for name, label in [('metrics', 'Download Comparison CSV'), ('cohort_membership', 'Download Comparison Cohort'),
+                        ('evidence_refs', 'Download Comparison Evidence References'), ('context', 'Download Comparison Context')]:
+        st.download_button(label, exports[name], file_name=f"{result.context['Comparison_ID']}_{name}.csv",
+                           mime="text/csv", key=f"wp2_download_{name}")
+    st.markdown("**Open a comparison product in WP1 Root Cause Investigation**")
+    product = st.selectbox("Comparison product to investigate", sorted(scope.product_ids), index=None,
+                           key="wp2_product")
+    for side, scenario in [('Reference', reference), ('Candidate', candidate)]:
+        st.button(f"Investigate {side} in WP1", key=f"wp2_investigate_{side.lower()}", disabled=product is None,
+                  on_click=_comparison_investigation_entry, args=(manifest['Run_ID'], scenario, product))
+    st.caption("After opening a side, use Planning Risk Summary → Root Cause Investigation for the existing plant/week evidence workflow.")
 
 
 def _sequential_views() -> None:
@@ -1026,7 +1332,7 @@ def _sequential_views() -> None:
     try:
         run_dir = Path(selected_path)
         run_dir = run_dir if run_dir.is_absolute() else REPOSITORY_ROOT / run_dir
-        outputs = load_sequential_outputs(run_dir)
+        outputs = load_sequential_outputs(run_dir, include_evidence=True)
         manifest = json.loads((run_dir / "run_manifest.json").read_text())
     except (OSError, ValueError, KeyError) as exc:
         st.warning(str(exc))
@@ -1044,15 +1350,15 @@ def _sequential_views() -> None:
         st.json({"Configuration": manifest["Configuration"], "Scope": manifest.get("Scope", {}), "Input_Validation": manifest.get("Input_Validation", {}), "Limitations": manifest["Limitations"]})
     performance = outputs["performance"]
     summary = scenario_kpis(performance)
-    scenario = st.selectbox("Sequential scenario", summary.Scenario.tolist())
+    scenario = st.selectbox("Sequential scenario", summary.Scenario.tolist(), key="sequential_scenario")
     row = summary[summary.Scenario.eq(scenario)].iloc[0]
     cards = st.columns(5)
     for card, column in zip(cards, ["Production_Coverage_Rate", "Demand_Fulfillment_Rate", "Capacity_Utilization", "Ending_Backlog", "Lost_Sales_Qty"]):
         value = row[column]
         card.metric(column.replace("_", " "), "N/A" if pd.isna(value) else (f"{value:.1%}" if column.endswith("Rate") or column == "Capacity_Utilization" else f"{value:,.2f}"))
     st.caption("0/0 ratios are N/A. Scenario fulfillment includes later service of horizon-origin backlog; weekly fulfillment refers to that week's current-demand cohort. Ending stocks are never summed across weeks.")
-    overview, comparison, detail, risk = st.tabs(
-        ["Scenario Overview", "Scenario Comparison", "Capacity Allocation Detail", "Planning Risk Summary"]
+    overview, comparison, detail, risk, tradeoff = st.tabs(
+        ["Scenario Overview", "Scenario Comparison", "Capacity Allocation Detail", "Planning Risk Summary", "Scenario Trade-off Analysis"]
     )
     with overview:
         weekly = performance[performance.Aggregation_Level.eq("Scenario × Week") & performance.Scenario.eq(scenario)]
@@ -1068,7 +1374,9 @@ def _sequential_views() -> None:
                    "Fulfilled_Backlog_Qty", "Fulfilled_Current_Qty", "Ending_Inventory", "Ending_Backlog", "Lost_Sales_Qty"]
         st.dataframe(frame[columns].sort_values(["Order_Date", "Plant_ID", "Allocation_Order"]), hide_index=True, use_container_width=True)
     with risk:
-        _planning_risk_summary(outputs, scenario)
+        _planning_risk_summary(outputs, scenario, manifest)
+    with tradeoff:
+        _scenario_tradeoff_analysis(run_dir, manifest)
 
 def main() -> None:
     st.set_page_config(page_title="Scenario Planning Decision Support", layout="wide")

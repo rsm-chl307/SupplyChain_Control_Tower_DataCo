@@ -61,6 +61,13 @@ class DashboardUploadWorkflowTests(unittest.TestCase):
         self.assertIn("Download allocation detail", [item.label for item in app.get("download_button")])
         self.assertIn("Planning Risk Summary", [item.label for item in app.get("tab")])
         self.assertTrue(any("Product Risk" in item.label for item in app.get("tab")))
+        self.assertIn("Root Cause Investigation", [item.label for item in app.get("tab")])
+        app.button(key="investigate_plant").click().run()
+        self.assertEqual(app.selectbox(key="investigation_path").value, "Plant → Week → Product")
+        app.selectbox(key="investigation_week").select_index(1).run()
+        self.assertFalse(app.exception)
+        self.assertTrue(any("Unavailable: original source file is missing" in str(item.value)
+                            for item in app.dataframe if "Source_Status" in item.value))
 
     def test_duplicate_column_mapping_is_reported_and_blocks_execution(self):
         app = self.app_with_user_example()
