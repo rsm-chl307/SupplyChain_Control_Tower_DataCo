@@ -1,6 +1,8 @@
 # 產品能力目錄 — 供應鏈規劃決策支援
 
-**執行摘要：** 現有應用可接收 CSV／JSON、驗證資料、執行多情境逐週 workload 規劃、發布可追溯結果，並提供 KPI、產品／工廠風險、WP1 證據調查與 WP2 同 Run 取捨比較。它是規則式、確定性、可解釋的 prototype。雙語 UI 尚未實作；本文件與對照英文版只說明目前能力及另行授權的未來提案。
+**2026-11-20 Phase 2 最終狀態：**應用程式自有英文／繁中顯示文字、說明及語言控制項已實作，原始引擎／CSV／佐證契約不變。CSV 模式在表單內套用語言以保留待送出輸入，其他模式使用側欄。最終驗收記錄 T25、T32 PASS，Phase 2 COMPLETE — PASS WITH LIMITATIONS，待 owner review。修復後的受測 Chromium 可正常顯示 CJK 字形；字型仍是 container-local，尚未建立環境重建後的持久性。詳見[最終服務驗證](phase_2/PHASE_2_FINAL_SERVICE_VERIFICATION_REPORT.md)與[整合驗收](phase_2/PHASE_2_FINAL_ACCEPTANCE_REPORT.md)。以下歷史提案章節保留作為紀錄。
+
+**執行摘要：** 現有應用可接收 CSV／JSON、驗證資料、執行多情境逐週 workload 規劃、發布可追溯結果，並提供 KPI、產品／工廠風險、WP1 證據調查與 WP2 同 Run 取捨比較。它是規則式、確定性、可解釋的 prototype。Phase 2 英文／繁中顯示層已通過宣告範圍的瀏覽器驗收；此結果不代表正式營運認證，也不代表環境重建後字型仍持久。本目錄區分已交付程式、驗收限制與未來提案。
 
 2026-11-18 · HEAD `4b6c84d99173f2472de7a973c1ca98c3a4b15ec2` + existing uncommitted WP1/WP2 worktree · [Other language](PRODUCT_CAPABILITY_CATALOG_EN.md) · [User Guide](USER_GUIDE_ZH-TW.md)
 
@@ -44,7 +46,7 @@
 
 **Implemented**：存在可達程式路徑；有測試依據者另列測試。**Partial**：部分存在或驗證不足。**Planned**：只有提案，未實作。**Deprecated**：明確停止使用；本次未找到將 Legacy 正式標示 Deprecated 的依據。
 
-**驗證層次**：「已實作且有測試」不代表本次重新執行。最後保存的完整 suite 為 227 passed、0 failed、0 skipped（169.334 秒）；本次只做文件／靜態核對，未重跑。瀏覽器人工視覺與功能驗收仍待使用者回報，不能列為通過。
+**驗證層次**：「已實作且有測試」不代表本次重新執行。最後保存的完整 suite 為 227 passed、0 failed、0 skipped（169.334 秒）；目錄撰寫工作只做文件／靜態核對，未重跑。其後的[Phase 2 最終驗收](phase_2/PHASE_2_FINAL_ACCEPTANCE_REPORT.md)記錄 T01–T33 與 P2-G00–G08 在各自宣告層次均 PASS，待 owner review。
 
 本目錄以目前 working tree 的 `src/`、唯一 Streamlit app、`tests/`、examples／templates 與 published manifests 為準；並對照全 repository 檔案清單、歷史 notebook 程式與 Markdown 設計／進度。不是只看 HEAD committed code。當舊規格與可達程式路徑不同時，列為歷史或待釐清，不倒推已完成。Route B 的舊 WP1/WP2 編號不等於這次 WP1 Root Cause／WP2 Trade-off。
 
@@ -81,7 +83,7 @@ H. Separate Existing Paths
    Legacy independent weeks / Historical Control Tower PBIX & Notebooks
 I. Interfaces & Proposed Presentation Extension
    Internal Python / CLI / CSV Contracts
-   Bilingual UI: PLANNED ONLY
+   Bilingual UI: IMPLEMENTED / T25-T32 ACCEPTANCE PASS
 ```
 
 ```mermaid
@@ -156,7 +158,7 @@ flowchart LR
 | F29 | H / Legacy independent weeks | Implemented／已實作 |
 | F30 | H / 歷史 Control Tower／Power BI | Partial／歷史資產存在，執行未驗證 |
 | F31 | I / 內部 Python／CLI 介面 | Implemented／已實作 |
-| F32 | I / 雙語介面與語言切換 | Planned／僅提案 |
+| F32 | I / 雙語介面與語言切換 | 已實作／T25-T32 宣告範圍驗收 PASS |
 
 ### F01 — CSV 上傳與範本
 
@@ -716,23 +718,23 @@ flowchart LR
 | Implementation Status | Implemented／已實作 |
 | Source Reference | [src/run_planning.py](../src/run_planning.py) — `run_csv_planning`; [src/scenario_comparison.py](../src/scenario_comparison.py) — `compare_published_results` |
 
-### F32 — 雙語介面與語言切換
+### F32 — 雙語 UI 與語言切換
 
-| 欄位 | 實作內容 |
+| 欄位 | 目前實作 |
 | --- | --- |
-| Module | I |
-| Feature | 雙語介面與語言切換 |
-| Business Purpose | 讓繁中與英文使用者以相同定義操作。 |
-| User Actions | 未來在側欄選 zh-TW／en；目前沒有此控制。 |
-| Required Inputs | 未來中央字典、stable keys、translation helper、session locale。 |
-| Optional Inputs | 見第 12 節提案。 |
-| Processing Logic | 僅翻譯顯示副本；永不翻譯 canonical keys、IDs、CSV 契約。 |
-| Outputs | 目前僅本次雙語文件；UI 翻譯尚未實作。 |
-| Business Interpretation | 手冊中的中文不是現有 UI 可切換的語言。 |
-| Dependencies | F01–F31 presentation boundaries |
-| Limitations | 需另行明確授權開發與測試；不得因本目錄直接開工。 |
-| Implementation Status | Planned／僅提案 |
-| Source Reference | Proposed only: centralized presentation translation layer; no current source implementation |
+| Module | 顯示層／國際化 |
+| Feature | 英文與繁體中文標籤、說明及語言選擇 |
+| Business Purpose | 以兩種語言理解既有規劃、調查與比較流程 |
+| User Actions | CSV 模式在表單內選擇並套用語言以保留待送出值；其他模式使用側欄語言選擇 |
+| Required Inputs | 既有 UI／工作階段；結果畫面需既有 Published Run |
+| Optional Inputs | 已保留上傳內容／設定；不需新資料集 |
+| Processing Logic | 中央字典、穩定識別鍵與狀態快照；只處理顯示副本／欄位設定 |
+| Outputs | 本地化應用程式自有摘要、標籤與說明；技術明細及匯出保持標準內容 |
+| Business Interpretation | 不改 KPI、群組、政策含義，不新增因果判定 |
+| Dependencies | 既有 Streamlit 與已接受後端；用戶端需支援 CJK 字形 |
+| Limitations | 原始後端／第三方明細保持原文；CJK 字型為 container-local，尚未驗證環境重建後的持久性 |
+| Implementation Status | T25/T32 瀏覽器驗收在宣告範圍內 PASS；Phase 2 PASS WITH LIMITATIONS，待 owner review；不代表正式營運就緒 |
+| Source Reference | dashboard/i18n.py、dashboard/display_metadata.py、dashboard/locales/*.json 及 scenario_planning_app.py 語言／顯示 helper |
 
 
 <a id="section-5"></a>
@@ -887,7 +889,7 @@ erDiagram
 
 ## 9. 端到端使用工作流
 
-以下五種工作流目前均有程式支援；不包含未來語言切換、跨 Run 或 AI 工作流。實際瀏覽器驗收仍未完成。
+以下五種工作流均有程式支援，並提供應用程式自有英文／繁中顯示。T25/T32 瀏覽器驗收已在宣告範圍內通過。跨 Run 與 AI 工作流仍不在範圍內；既有 Phase 1 限制見最終驗收報告。
 
 ### Workflow A — 開始新的 Planning Run
 
@@ -995,7 +997,7 @@ CSV outputs 與 configuration 是檔案契約，不是網路服務。沒有認�
 | L03 | 資料完整性 | Implemented／有測試 | UNKNOWN 不轉零；coverage 不取兩側交集；空 cohort／零分母 N/A，缺 endpoint 阻擋。 |
 | L04 | 欠單與優先級 | Implemented／受限 | 一 scenario 一政策；LOST_SALES 不容非零 opening backlog；priority 1/2/3、同 trajectory 不變；無 backlog aging。 |
 | L05 | Workload／capacity | Implemented／受限 | 產品 factor，非 plant-specific；版本／單位不相容阻擋 workload delta；不能視 cohort 擁有整個 shared pool；capacity multiplier≤1。 |
-| L06 | UI 與驗收 | Implemented／視覺未驗證 | 英文為主、無語言 selector；Run 以路徑選取；WP2 UI scope 固定全 Run；AppTest 不等於真實瀏覽器驗收。 |
+| L06 | UI 與驗收 | 已實作／宣告範圍驗收通過 | 英文／zh-TW 應用自有顯示；T25/T32 瀏覽器驗收已通過。字型為 container-local。Run 仍以路徑選取，WP2 使用完整 Run；不代表正式營運認證。 |
 | L07 | 匯出與來源留存 | Implemented／受限 | CSV／JSON，不提供 XLSX/PDF/ZIP；無自動來源封存；upload temp 清除後 raw source 可 unavailable。 |
 | L08 | 高階規劃與整合 | Not implemented／未實作 | 無 forecasting、optimization、跨廠替代、BOM、lead time、ERP 寫入、HTTP business API、排程 automation、AI。 |
 | L09 | 歷史文件衝突 | Documented／需按程式解讀 | readme.md 仍寫 upload wizard deferred，但 UI 已存在；Route B WP 編號與後來 WP1/WP2 不同；歷史 monitoring KPI 不當成 Sequential KPI。 |
@@ -1004,7 +1006,9 @@ CSV outputs 與 configuration 是檔案契約，不是網路服務。沒有認�
 
 <a id="section-12"></a>
 
-## 12. 未來雙語 UI：獨立實作提案
+## 12. 歷史雙語 UI 提案 — 現況以 Phase 2 補充為準
+
+本節保留 Phase 2 授權實作前的提案內容。已交付實作及最終驗收狀態請以 F32 與上方現況摘要為準。
 
 **獨立實作提案，未授權開發。** 現有 UI 大多直接寫英文 literal；沒有 locale selector、translation helper 或中央字典。本次只建立雙語文件。
 
@@ -1055,7 +1059,7 @@ Fallback：所選 locale → en → 顯示 `[missing:key]` 並記錄開發診斷
 
 | Category | 建議 | 價值與依賴 | Complexity | 架構位置 |
 | --- | --- | --- | --- | --- |
-| UX / Usability | 雙語 UI、KPI 說明與一致空狀態 | 優先降低學習成本；需 glossary、translation layer、browser 驗收。 | Medium | 現有 presentation architecture；獨立授權。 |
+| UX / Usability | Phase 2 範圍以外的雙語體驗改善 | 擴大 glossary 與 empty state 覆蓋；需另行審查範圍與驗收。 | Low–Medium | 現有 presentation architecture。 |
 | UX / Usability | Published Run 選擇器與來源假設摘要 | 減少路徑錯誤；需受限目錄掃描與既有 loader。 | Low–Medium | 現有 UI；不得變更 publication gates。 |
 | Data Management | 可選來源封存與留存政策 | 提高重現性；需使用者資料政策、容量與來源 hash 清單。 | Medium | runner 邊界新管理功能，不改引擎。 |
 | Analytics / Decision Support | 釐清風險／服務語義及 comparability 顯示 | 降低把共現當因果、把零欠單當服務的誤解；依賴現有 signals。 | Low | 既有 presentation；不新增分數或公式。 |

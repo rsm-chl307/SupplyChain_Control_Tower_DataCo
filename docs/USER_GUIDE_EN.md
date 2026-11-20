@@ -1,6 +1,6 @@
 # User Guide — Supply Chain Planning Decision Support
 
-**Quick summary:** New data follows upload → validate → execute. Existing results follow Published Run → KPIs/risk. Use WP1 for evidence and WP2 for two-scenario trade-offs. The current UI is primarily English, with no language switch. Instructions below describe existing controls; future capabilities are explicitly labeled proposals.
+**Quick summary:** New data follows upload → validate → execute. Existing results follow Published Run → KPIs/risk. Use WP1 for evidence and WP2 for two-scenario trade-offs. Phase 2 English/Traditional Chinese presentation passed its declared browser acceptance scope; CJK fonts remain container-local, with no rebuild-persistence guarantee. Instructions below describe existing controls; future capabilities are explicitly labeled proposals.
 
 2026-11-18 · [Capability Catalog](PRODUCT_CAPABILITY_CATALOG_EN.md) · [Other language](USER_GUIDE_ZH-TW.md)
 
@@ -48,11 +48,13 @@ Earlier acceptance preparation used port 8502; it is not a permanent address or 
 
 <a id="u02"></a>
 
-## U02 — Language selection: current availability
+## U02 — Language selection
 
-**There is no Language selector today; the UI is primarily English.** The Chinese manual retains actual English button/field labels for matching the screen.
+English is the default; Traditional Chinese (zh-TW) presentation passed the Phase 2 browser acceptance at its declared scope (T25/T32). In CSV upload mode, find Language / 語言 inside the planning form, choose English or 繁體中文, then select Apply language and keep form inputs. This transmits pending edits only; it does not validate inputs or execute planning. The sidebar explains this location. In JSON configuration and legacy modes, use the sidebar Language selector.
 
-A future sidebar `Language / 語言` selector supporting `zh-TW` and `en` is proposed but not implemented. Do not look for it in the current application. It would translate display labels only, never formulas, IDs, columns, runs/scenarios, evidence or CSVs. See catalog section 12; implementation needs separate authorization.
+Run/Scenario IDs, technical statuses, original diagnostic details, uploaded content, canonical CSV headers/data and filenames stay unchanged. Metric definitions and technical identifiers remain available under Technical IDs and display definitions. Language persists within the browser session, not across browser restarts. Wide tables may require horizontal scrolling.
+
+The final report records readable CJK rendering in the tested Chromium runtime after remediation. Fonts are container-local, so their persistence across environment rebuilds is not established. This is not a production uptime or deployment guarantee; see the Phase 2 final service verification report.
 
 <a id="u03"></a>
 
@@ -265,7 +267,7 @@ Missing staged originals can be normal; no fictitious source orders explain scen
 4. Check Comparison_ID, Reference/Candidate Run_ID and Scenario, and Comparison_Context; metrics additionally embeds evidence/membership JSON.
 5. Import string IDs as text in spreadsheets and retain canonical English headers.
 
-WP2 writes missing values as N/A; other CSVs may use blanks. Future language switching must not change CSV bytes. No XLSX, PDF or bundled download is available.
+WP2 writes missing values as N/A; other CSVs may use blanks. English/Traditional Chinese display switching does not change CSV bytes. No XLSX, PDF or bundled download is available.
 
 <a id="u21"></a>
 
@@ -292,7 +294,7 @@ Use the troubleshooting table below. Record actions, Run_ID, Scenario and the fu
 
 ## U22 — Known limitations and acceptance status
 
-The capabilities have code and automated-test evidence. The recorded final suite is 227 passed, 0 failed, 0 skipped; it was not rerun here. Browser visual/functional acceptance still requires actual user observations; health 200 or AppTest is insufficient.
+The capabilities have code and automated-test evidence. The recorded full suite is 227 passed, 0 failed, 0 skipped; it was not rerun while updating this guide. Phase 2 final acceptance records T01–T33 and P2-G00–G08 as PASS at their declared layers, pending owner review. This does not claim complete negative-data Published E2E coverage or production certification.
 
 Boundaries: same run/full horizon, one plant per product, common units, product factors, fixed priorities and capacity multiplier≤1. No forecast, optimizer, BOM/lead times, AI, ERP integration, business HTTP API or language selector. Historical PBIX functionality is separate. No current-application screenshots were obtained and no fabricated screenshots are used.
 
@@ -302,7 +304,7 @@ Boundaries: same run/full horizon, one plant per product, common units, product 
 
 ## Five end-to-end workflows
 
-All five workflows have current code support. They exclude future language switching, cross-run and AI workflows. Browser acceptance remains pending.
+All five workflows have current code support, including English/Traditional Chinese presentation. T25/T32 browser acceptance passed at the declared scope. Cross-run and AI workflows remain out of scope; see the final acceptance report for limitations.
 
 ### Workflow A — Start a new planning run
 
@@ -420,3 +422,5 @@ flowchart TD
 Technical values such as `Scenario`, `Product Card Id`, `CARRY_FORWARD` and `COMPARABLE` stay unchanged; Chinese terms are display/documentation labels.
 
 Operating references: [dashboard/scenario_planning_app.py](../dashboard/scenario_planning_app.py) — `main`; [dashboard/scenario_planning_app.py](../dashboard/scenario_planning_app.py) — `_user_csv_upload_workflow`; [dashboard/scenario_planning_app.py](../dashboard/scenario_planning_app.py) — `_sequential_views`; [dashboard/scenario_planning_app.py](../dashboard/scenario_planning_app.py) — `_planning_risk_summary`; [dashboard/scenario_planning_app.py](../dashboard/scenario_planning_app.py) — `_root_cause_investigation`; [dashboard/scenario_planning_app.py](../dashboard/scenario_planning_app.py) — `_scenario_tradeoff_analysis`
+
+Current Phase 2 workflow: Prepare Data and Analyze Existing Run are guidance around existing controls. Load a known published folder manually; global scenario controls overview/risk/WP1, while WP2 selects its own explicit pair. After a side/product handoff, open Planning Risk Summary → Root Cause Investigation manually. No Run Picker or automatic tab switching was added.

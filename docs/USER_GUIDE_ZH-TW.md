@@ -1,6 +1,6 @@
 # 使用手冊 — 供應鏈規劃決策支援
 
-**快速摘要：** 新資料走上傳→驗證→執行；既有結果走 Published Run→KPI／風險；需要證據走 WP1；需要兩情境取捨走 WP2。現有 UI 英文為主，沒有語言切換。下列均描述現有控制，未來功能會明示為提案。
+**快速摘要：** 新資料走上傳→驗證→執行；既有結果走 Published Run→KPI／風險；需要證據走 WP1；需要兩情境取捨走 WP2。Phase 2 英文／繁中顯示已通過宣告範圍的瀏覽器驗收（T25/T32）；CJK 字型仍是 container-local，未保證環境重建後持續可用。下列均描述現有控制，未來功能會明示為提案。
 
 2026-11-18 · [Capability Catalog](PRODUCT_CAPABILITY_CATALOG_ZH-TW.md) · [Other language](USER_GUIDE_EN.md)
 
@@ -48,11 +48,13 @@ python -B -m streamlit run dashboard/scenario_planning_app.py
 
 <a id="u02"></a>
 
-## U02 — 語言選擇：目前狀態
+## U02 — 語言選擇
 
-**目前沒有 Language selector；介面主要為英文。** 本手冊中文解釋保留實際英文按鈕／欄位名稱供對照。
+英文為預設語言；Phase 2 繁體中文（zh-TW）顯示已在宣告範圍內通過瀏覽器驗收（T25/T32）。CSV 上傳模式請在既有規劃表單內找到 Language / 語言，選擇 English 或繁體中文，再按「套用語言並保留表單輸入」。此操作只傳送待送出的表單值，不會驗證輸入或執行規劃；側欄會說明位置。JSON 設定及歷史獨立週模式則使用側欄語言選擇。
 
-未來提案為 sidebar `Language / 語言`，支援 `zh-TW` 與 `en`，但尚未實作，不能依本手冊尋找此控制。語言切換只改顯示標籤，不改公式、IDs、欄名、Run／Scenario、證據或 CSV。詳見能力目錄第 12 節；開發須另行授權。
+Run／Scenario 識別碼、機器狀態、原始診斷明細、上傳內容、標準 CSV 欄位／資料與檔名保持不變。請在「技術識別碼與顯示定義」檢視指標意義與原始識別碼。語言只保留於目前瀏覽器工作階段，不保證重新開啟瀏覽器後保留。寬表可能需要水平捲動。
+
+最終報告記錄字型修復後，受測 Chromium 可正常顯示 CJK 字形。字型仍是 container-local，未建立環境重建後的持久性；這不代表正式營運 uptime 或部署保證。詳見 Phase 2 最終服務驗證報告。
 
 <a id="u03"></a>
 
@@ -292,9 +294,9 @@ WP2 N/A 會寫成 N/A；其他 CSV 缺值可為空。UI 語言未來切換也不
 
 ## U22 — 已知限制與驗收狀態
 
-目前功能有程式與 automated test 依據；最後保存的完整結果為 227 passed、0 failed、0 skipped，本次未重跑。瀏覽器視覺及功能驗收仍待使用者實際回報，不能因 health 200 或 AppTest 就聲稱通過。
+目前功能有程式與 automated test 依據；最後保存的完整結果為 227 passed、0 failed、0 skipped，更新本指南時未重跑。Phase 2 最終驗收記錄 T01–T33 與 P2-G00–G08 在宣告層次均 PASS，待 owner review；這不代表完整 negative-data Published E2E 覆蓋或正式營運認證。
 
-限制：同 Run／完整 horizon、單產品單工廠、共同單位、產品 factor、固定 priority、capacity multiplier≤1；無 forecast、optimizer、BOM／lead-time、AI、ERP integration、HTTP business API、語言 selector。歷史 PBIX 功能不等於此 UI。未取得當前應用 screenshot，本手冊不使用示意圖冒充畫面。
+限制：同 Run／完整 horizon、單產品單工廠、共同單位、產品 factor、固定 priority、capacity multiplier≤1；無 forecast、optimizer、BOM／lead-time、AI、ERP integration、HTTP business API。英文／繁中語言 selector 已於 Phase 2 實作並在宣告範圍內驗收。歷史 PBIX 功能不等於此 UI。未取得當前應用 screenshot，本手冊不使用示意圖冒充畫面。
 
 [完整限制、公式與開發定位](PRODUCT_CAPABILITY_CATALOG_ZH-TW.md#section-11)
 
@@ -302,7 +304,7 @@ WP2 N/A 會寫成 N/A；其他 CSV 缺值可為空。UI 語言未來切換也不
 
 ## 五種端到端工作流
 
-以下五種工作流目前均有程式支援；不包含未來語言切換、跨 Run 或 AI 工作流。實際瀏覽器驗收仍未完成。
+以下五種工作流均有程式支援，包含英文／繁中顯示。T25/T32 瀏覽器驗收已在宣告範圍內通過。跨 Run 與 AI 工作流仍不在範圍內；限制詳見最終驗收報告。
 
 ### Workflow A — 開始新的 Planning Run
 
@@ -420,3 +422,5 @@ flowchart TD
 技術識別值（例如 `Scenario`、`Product Card Id`、`CARRY_FORWARD`、`COMPARABLE`）保留原樣；中文是顯示／說明用語。
 
 操作對照來源：[dashboard/scenario_planning_app.py](../dashboard/scenario_planning_app.py) — `main`; [dashboard/scenario_planning_app.py](../dashboard/scenario_planning_app.py) — `_user_csv_upload_workflow`; [dashboard/scenario_planning_app.py](../dashboard/scenario_planning_app.py) — `_sequential_views`; [dashboard/scenario_planning_app.py](../dashboard/scenario_planning_app.py) — `_planning_risk_summary`; [dashboard/scenario_planning_app.py](../dashboard/scenario_planning_app.py) — `_root_cause_investigation`; [dashboard/scenario_planning_app.py](../dashboard/scenario_planning_app.py) — `_scenario_tradeoff_analysis`
+
+Phase 2 現行流程：準備資料與分析既有規劃是既有控制項周圍的操作指引。請手動輸入已知發布資料夾；全域情境控制概觀／風險／WP1，WP2 則獨立選擇明確配對。選擇一側／產品交接後，請手動切至規劃風險摘要 → 根因調查；未新增 Run Picker 或自動切換頁籤。

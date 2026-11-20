@@ -199,6 +199,6 @@ DataCo is not a third required engine mode: it is a USER_DATA reference configur
 
 The existing Streamlit app starts in sequential mode with the portable synthetic config path. A configuration path can select USER_DATA; active mode, scope and input diagnostics are displayed. No DataCo data is loaded automatically.
 
-A multi-file upload wizard and interactive column-mapping editor are deferred. The tested interface is CSV + JSON configuration, validation CLI, Python API and the existing configuration-path runner. No database, ERP integration, authentication, new dependency or ingestion platform was added.
+The Streamlit interface implements multi-file CSV upload, templates, interactive canonical-to-source column mapping, explicit assumptions, readiness validation and the existing runner. CSV + JSON configuration, validation CLI and Python interfaces remain available. Phase 2 adds presentation-only English/Traditional Chinese labels and workflow guidance; canonical files and input rules are unchanged. No database, ERP integration, authentication, new dependency or ingestion platform was added.
 
 The current calendar uses Sunday-ending weekly buckets, one plant per product and one quantity unit per aggregate cohort. The system does not infer missing demand, production standards, procurement history, forecasts or actual stock.

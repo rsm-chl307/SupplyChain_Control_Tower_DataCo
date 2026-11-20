@@ -1,6 +1,8 @@
 # Product Capability Catalog — Supply Chain Planning Decision Support
 
-**Executive summary:** The application accepts CSV/JSON input, validates readiness, executes weekly workload planning across scenarios, publishes traceable results, and provides KPIs, product/plant risk, WP1 evidence investigation and WP2 same-run trade-offs. It is a rule-based, deterministic and explainable prototype. Bilingual UI is not implemented; this catalog and its Chinese counterpart document current capabilities and separately authorized future proposals.
+**2026-11-20 Phase 2 final status:** English/Traditional Chinese application-owned labels/help and locale controls are implemented with unchanged canonical engine/CSV/evidence contracts. CSV forms apply language inside the form to preserve pending inputs; other modes use the sidebar. Final acceptance records T25 and T32 PASS and Phase 2 COMPLETE — PASS WITH LIMITATIONS, pending owner review. The tested Chromium runtime rendered CJK text readably after remediation; fonts remain container-local, so persistence across environment rebuilds is not established. See the [final service verification](phase_2/PHASE_2_FINAL_SERVICE_VERIFICATION_REPORT.md) and [consolidated acceptance](phase_2/PHASE_2_FINAL_ACCEPTANCE_REPORT.md). The historical proposal sections below are retained as history.
+
+**Executive summary:** The application accepts CSV/JSON input, validates readiness, executes weekly workload planning across scenarios, publishes traceable results, and provides KPIs, product/plant risk, WP1 evidence investigation and WP2 same-run trade-offs. It is a rule-based, deterministic and explainable prototype. Phase 2 English/Traditional Chinese presentation passed its declared browser acceptance scope; this does not certify production readiness or font persistence across rebuilt environments. This catalog separates delivered code, acceptance limits and future proposals.
 
 2026-11-18 · HEAD `4b6c84d99173f2472de7a973c1ca98c3a4b15ec2` + existing uncommitted WP1/WP2 worktree · [Other language](PRODUCT_CAPABILITY_CATALOG_ZH-TW.md) · [User Guide](USER_GUIDE_EN.md)
 
@@ -28,7 +30,7 @@ This is a **scenario-based supply chain planning decision-support prototype** fo
 
 It supports questions such as which product/week needs attention, how demand increases or capacity disruption change service/backlog, and how two scenarios in the same run affect a fixed product cohort. People decide whether to change plans; the application neither issues procurement/production orders nor chooses an optimal scenario.
 
-It is not a Production APS, ERP replacement, real-time production planning system or enterprise optimization platform. Forecasting, BOM/multi-echelon materials, production lead times, machine scheduling, procurement optimization, financial impacts, AI agents, external REST APIs and bilingual UI are not implemented.
+It is not a Production APS, ERP replacement, real-time production planning system or enterprise optimization platform. Forecasting, BOM/multi-echelon materials, production lead times, machine scheduling, procurement optimization, financial impacts, AI agents, external REST APIs are not implemented. Bilingual presentation has the acceptance limitation stated above.
 
 | Capability layer | Purpose and boundary |
 | --- | --- |
@@ -44,7 +46,7 @@ It is not a Production APS, ERP replacement, real-time production planning syste
 
 **Implemented** means a reachable code path exists; test evidence is listed separately. **Partial** means incomplete capability or insufficient verification. **Planned** means proposal only. **Deprecated** requires an explicit retirement designation; none was found for Legacy.
 
-**Verification levels:** “implemented with test evidence” does not mean tests were rerun here. The recorded final full suite is 227 passed, 0 failed, 0 skipped (169.334 seconds). This task performs documentation/static checks only. User-assisted browser visual/functional acceptance remains pending and is not marked passed.
+**Verification levels:** “implemented with test evidence” does not mean tests were rerun here. The recorded final full suite is 227 passed, 0 failed, 0 skipped (169.334 seconds). The catalog authoring task performed documentation/static checks only; the subsequent [final Phase 2 acceptance](phase_2/PHASE_2_FINAL_ACCEPTANCE_REPORT.md) records T01–T33 and P2-G00–G08 as PASS at their declared layers, pending owner review.
 
 This catalog uses the current worktree’s `src/`, single Streamlit app, `tests/`, examples/templates and published manifests, cross-checked against the repository inventory, historical notebook code and Markdown designs/progress. It is not limited to committed HEAD. When old specifications differ from reachable code, classify them as historical or open questions, not implemented features. Historical Route B WP1/WP2 numbering differs from WP1 Root Cause/WP2 Trade-off.
 
@@ -81,7 +83,7 @@ H. Separate Existing Paths
    Legacy independent weeks / Historical Control Tower PBIX & Notebooks
 I. Interfaces & Proposed Presentation Extension
    Internal Python / CLI / CSV Contracts
-   Bilingual UI: PLANNED ONLY
+   Bilingual UI: IMPLEMENTED / T25-T32 ACCEPTANCE PASS
 ```
 
 ```mermaid
@@ -156,7 +158,7 @@ Core engines use DataFrames/pure functions; CSV I/O belongs to adapters, runners
 | F29 | H / Legacy independent weeks | Implemented |
 | F30 | H / Historical Control Tower / Power BI | Partial / historical assets present, execution not verified |
 | F31 | I / Internal Python and CLI interfaces | Implemented |
-| F32 | I / Bilingual UI and language switching | Planned / proposal only |
+| F32 | I / Bilingual UI and language switching | Implemented / T25-T32 acceptance PASS at declared scope |
 
 ### F01 — CSV upload and templates
 
@@ -718,21 +720,21 @@ Core engines use DataFrames/pure functions; CSV I/O belongs to adapters, runners
 
 ### F32 — Bilingual UI and language switching
 
-| Field | Actual behavior |
+| Field | Current implementation |
 | --- | --- |
-| Module | I |
-| Feature | Bilingual UI and language switching |
-| Business Purpose | Let Traditional Chinese and English users operate with the same definitions. |
-| User Actions | Future sidebar zh-TW/en selector; this control does not exist today. |
-| Required Inputs | Future central dictionaries, stable keys, translation helper, session locale. |
-| Optional Inputs | See section 12 proposal. |
-| Processing Logic | Translate display copies only; never canonical keys, IDs or CSV contracts. |
-| Outputs | Current deliverable is bilingual documentation only; UI translation is not implemented. |
-| Business Interpretation | Chinese in the manuals is not an available UI language toggle. |
-| Dependencies | F01–F31 presentation boundaries |
-| Limitations | Requires separate explicit authorization for development/testing; this catalog authorizes no implementation. |
-| Implementation Status | Planned / proposal only |
-| Source Reference | Proposed only: centralized presentation translation layer; no current source implementation |
+| Module | Presentation / internationalization |
+| Feature | English and Traditional Chinese labels, help and locale selection |
+| Business Purpose | Understand the existing planning/investigation/comparison workflow in either language |
+| User Actions | CSV mode: select/apply language inside the planning form to retain pending inputs. Other modes: sidebar Language selector |
+| Required Inputs | Existing UI/session; existing Published Run for result views |
+| Optional Inputs | Existing retained upload/settings; no new dataset requirement |
+| Processing Logic | Central dictionaries, stable keys and state snapshot; presentation copies/column configuration only |
+| Outputs | Localized application-owned summaries/labels/help; canonical technical details and exports unchanged |
+| Business Interpretation | No change to KPI/cohort/policy meaning or causal claims |
+| Dependencies | Existing Streamlit UI and accepted backend; client CJK glyph capability for readable Chinese |
+| Limitations | Original backend/third-party details remain raw; CJK fonts are container-local and persistence across environment rebuilds is not established |
+| Implementation Status | T25/T32 browser acceptance PASS at declared scope; Phase 2 PASS WITH LIMITATIONS pending owner review; not a production readiness claim |
+| Source Reference | dashboard/i18n.py, dashboard/display_metadata.py, dashboard/locales/*.json, scenario_planning_app.py language/display helpers |
 
 
 <a id="section-5"></a>
@@ -887,7 +889,7 @@ Each run gets a separate `sequential_<UTC timestamp>_<UUID prefix>/`. The UI/gen
 
 ## 9. End-to-end user workflows
 
-All five workflows have current code support. They exclude future language switching, cross-run and AI workflows. Browser acceptance remains pending.
+All five workflows have current code support and the application-owned English/Traditional Chinese display. T25/T32 browser acceptance passed at the declared scope. Cross-run and AI workflows remain out of scope; see the final acceptance report for inherited limitations.
 
 ### Workflow A — Start a new planning run
 
@@ -995,7 +997,7 @@ CSV outputs and configurations are file contracts, not network services. There i
 | L03 | Data completeness | Implemented / test evidence | Never convert UNKNOWN to zero or intersect coverage silently; empty cohorts/zero denominators are N/A; missing endpoints block. |
 | L04 | Backlog and priority | Implemented / restricted | One policy per scenario; LOST_SALES rejects nonzero opening backlog; priority 1/2/3, constant per trajectory; no backlog aging. |
 | L05 | Workload / capacity | Implemented / restricted | Product factors, not plant-specific; incompatible units/versions block workload deltas; cohorts do not own the shared pool; capacity multiplier≤1. |
-| L06 | UI and acceptance | Implemented / visual acceptance pending | Primarily English, no language selector; path-based run selection; full-run WP2 UI scope; AppTest is not browser acceptance. |
+| L06 | UI and acceptance | Implemented / accepted at declared scope | English/zh-TW application-owned display; T25/T32 browser acceptance passed. Fonts are container-local. Manual path selection and full-run WP2 scope remain; this is not production certification. |
 | L07 | Exports and source retention | Implemented / restricted | CSV/JSON, no XLSX/PDF/ZIP; no automatic source archive; upload originals can be unavailable after temporary cleanup. |
 | L08 | Advanced planning/integration | Not implemented | No forecasting, optimization, cross-plant substitution, BOM, lead time, ERP writeback, business HTTP API, scheduled automation or AI. |
 | L09 | Historical documentation conflicts | Documented / reconcile with code | readme.md still says upload wizard deferred although UI exists; Route B WP numbering differs from later WP1/WP2; historical monitoring KPIs are not Sequential KPIs. |
@@ -1004,7 +1006,9 @@ CSV outputs and configurations are file contracts, not network services. There i
 
 <a id="section-12"></a>
 
-## 12. Future bilingual UI: separate implementation proposal
+## 12. Historical bilingual UI proposal — current status in the Phase 2 addendum
+
+This subsection preserves the proposal as it stood before the authorized Phase 2 implementation. The delivered implementation and final acceptance status are recorded in F32 and the current-state summary above.
 
 **Separate implementation proposal; development is not authorized.** Existing UI largely uses English literals and has no locale selector, translation helper or central dictionary. This task creates bilingual documents only.
 
@@ -1055,7 +1059,7 @@ All items below are unimplemented suggestions, prioritizing clarity and existing
 
 | Category | Suggestion | Value and dependencies | Complexity | Architecture fit |
 | --- | --- | --- | --- | --- |
-| UX / Usability | Bilingual UI, KPI help and consistent empty states | First reduce learning cost; needs glossary, translation layer and browser acceptance. | Medium | Existing presentation architecture; separate authorization. |
+| UX / Usability | Further bilingual UX refinements beyond accepted Phase 2 scope | Improve glossary coverage and empty states; requires separate scope/acceptance review. | Low–Medium | Existing presentation architecture. |
 | UX / Usability | Published-run picker and source-assumption summary | Reduce path mistakes; needs bounded directory discovery and existing loader. | Low–Medium | Existing UI; preserve publication gates. |
 | Data Management | Optional source archival and retention policy | Improve reproducibility; needs data policy, storage and source hashes. | Medium | New management capability at runner boundary, not engines. |
 | Analytics / Decision Support | Clarify risk/service semantics and comparability display | Reduce causal and zero-backlog/service confusion; depends on existing signals. | Low | Existing presentation; no new score/formula. |
@@ -1117,7 +1121,7 @@ All items below are unimplemented suggestions, prioritizing clarity and existing
 
 Technical values such as `Scenario`, `Product Card Id`, `CARRY_FORWARD` and `COMPARABLE` stay unchanged; Chinese terms are display/documentation labels.
 
-The four documents are paired views, not four product specifications: catalogs serve business/developer readers and manuals serve operators. Both catalogs share F01–F32, M01–M20 and L01–L11; both manuals share U01–U22 and Workflows A–E. Update capabilities, formulas, statuses and limitations in both languages together. Preserve current English UI literals and canonical IDs; never imply the untranslated UI is already bilingual.
+The four documents are paired views, not four product specifications: catalogs serve business/developer readers and manuals serve operators. Both catalogs share F01–F32, M01–M20 and L01–L11; both manuals share U01–U22 and Workflows A–E. Update capabilities, formulas, statuses and limitations in both languages together. Preserve canonical IDs and both-language display keys; distinguish implemented translations from the unresolved Chinese visual acceptance.
 
 Maintenance order: inspect implementation/tests → update capability IDs/source functions → synchronize the other language → review glossary terms → compare formulas/units/zero policies/workflows/limits → check links/diffs. Use bilingual terminology at first mention and consistent terms thereafter. Do not translate code, CLI, CSV headers or scenario/status IDs. Translation must not alter service/fulfillment definitions.
 
