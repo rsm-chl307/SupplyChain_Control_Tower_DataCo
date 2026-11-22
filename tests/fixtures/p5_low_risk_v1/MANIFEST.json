@@ -1,0 +1,15 @@
+{
+  "data_mode": "SYNTHETIC_DEMO",
+  "files_sha256": {
+    "config.json": "6c8ab0764e81e999bba2d43a510c3fff982f1f305aa49ac5a0b500751875dde7",
+    "demand.csv": "fb2f44256bc4ea28e22ed9900818ec7f44e35683da8c694bd1228d2540cfcc68",
+    "external_receipts.csv": "f5ad33a2dc7fef667c4a33ba6812b9fe7519723629a3aad2f7ea634bec1c106c",
+    "initial_inventory.csv": "1ebaee4367e05e7cc4eb3571c40c87f972e3c6be37d4cb30b7e23641bb7ccf05",
+    "plants.csv": "457033301960c8441008d608ba7d057a03e485f47f92d0ebb430bd95237e6f12",
+    "product_plant_mapping.csv": "a485d4fc94ca1d0e4aad9a5d91fe4858fe4f35d8560872c39141d7d15c604d53",
+    "products.csv": "612c3b8a87efec1d21981acb401d685fa949dc62fac482f487b3049639e09393",
+    "weekly_capacity.csv": "1d9e8fb734276d2bb9d89a8c033aad70e813a6658862e2c2272d9054748a5a24",
+    "workload_factors.csv": "1d801e1491eb3ccae4623c4ba9790abade79a10b149eee174271fdbdbe177dbb"
+  },
+  "fixture_version": "p5-low-risk-v1"
+}

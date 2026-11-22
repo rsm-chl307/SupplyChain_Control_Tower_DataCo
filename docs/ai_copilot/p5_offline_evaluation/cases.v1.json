@@ -1,0 +1,130 @@
+{
+  "dataset_version": "p5-offline-evaluation-1",
+  "fixture": "examples/planning/synthetic_demo",
+  "cases": [
+    {
+      "id": "EV-01",
+      "scenario": "Baseline",
+      "max_records": 2,
+      "comparison": false,
+      "focus": "Capacity bottleneck",
+      "evidence": [
+        {"section": "capacity_analysis", "source_ref": "s7", "kind": "capacity", "field": "Capacity_Utilization", "expected": 1.0, "unit": "ratio"},
+        {"section": "capacity_analysis", "source_ref": "s7", "kind": "capacity", "field": "Bottleneck_Plant_Weeks", "expected": 3}
+      ],
+      "numerical_slot_ref": "s7",
+      "numerical_slot_field": "Capacity_Utilization",
+      "expected_findings": ["Identify the published capacity pressure as a bounded finding."],
+      "unsupported_conclusions": ["A specific plant caused all service deterioration.", "Capacity will remain saturated in future unrun weeks."]
+    },
+    {
+      "id": "EV-02",
+      "scenario": "Demand_Surge",
+      "max_records": 2,
+      "comparison": false,
+      "focus": "Demand surge",
+      "evidence": [
+        {"section": "capacity_analysis", "source_ref": "s8", "kind": "pool", "field": "Unmet_Workload", "expected": 11.6, "unit": "EqWU"},
+        {"section": "inventory_analysis", "source_ref": "s11", "kind": "terminal", "field": "Ending_Backlog", "expected": 7.300000000000001, "unit": "EA"}
+      ],
+      "numerical_slot_ref": "s8",
+      "numerical_slot_field": "Unmet_Workload",
+      "expected_findings": ["Describe pressure in the selected Demand_Surge scenario without claiming a causal proof."],
+      "unsupported_conclusions": ["Demand surge is the sole cause of every shortage.", "An unrun intervention will eliminate backlog."]
+    },
+    {
+      "id": "EV-03",
+      "scenario": "Capacity_Disruption",
+      "max_records": 2,
+      "comparison": false,
+      "focus": "Capacity disruption",
+      "evidence": [
+        {"section": "capacity_analysis", "source_ref": "s7", "kind": "capacity", "field": "Available_Workload_Capacity", "expected": 9.6, "unit": "EqWU"},
+        {"section": "service_analysis", "source_ref": "s9", "kind": "service", "field": "Demand_Fulfillment_Rate", "expected": 0.4461538461538462, "unit": "ratio"}
+      ],
+      "numerical_slot_ref": "s7",
+      "numerical_slot_field": "Available_Workload_Capacity",
+      "expected_findings": ["Identify constrained capacity and distinguish it from a verified root cause of service changes."],
+      "unsupported_conclusions": ["The disruption was caused by a named supplier.", "Service has a guaranteed future recovery date."]
+    },
+    {
+      "id": "EV-04",
+      "scenario": "Combined_Stress",
+      "max_records": 2,
+      "comparison": false,
+      "focus": "Inventory shortage and coverage risk",
+      "evidence": [
+        {"section": "inventory_analysis", "source_ref": "s11", "kind": "terminal", "field": "Ending_Backlog", "expected": 8.5, "unit": "EA"},
+        {"section": "inventory_analysis", "source_ref": "s11", "kind": "terminal", "field": "Ending_Inventory", "expected": 0.0, "unit": "EA"}
+      ],
+      "numerical_slot_ref": "s11",
+      "numerical_slot_field": "Ending_Backlog",
+      "expected_findings": ["Describe the published terminal backlog and inventory state without double counting stock across weeks."],
+      "unsupported_conclusions": ["All products are out of stock at every plant.", "A procurement action has been executed."]
+    },
+    {
+      "id": "EV-05",
+      "scenario": "Baseline",
+      "max_records": 4,
+      "comparison": true,
+      "focus": "Service-level deterioration in an explicit Baseline versus Demand_Surge comparison",
+      "evidence": [
+        {"section": "scenario_comparison", "source_ref": "s27", "kind": "comparison_metric", "field": "Reference_Value", "expected": 0.5384615384615384, "unit": "ratio"},
+        {"section": "scenario_comparison", "source_ref": "s27", "kind": "comparison_metric", "field": "Candidate_Value", "expected": 0.4895104895104895, "unit": "ratio"},
+        {"section": "scenario_comparison", "source_ref": "s27", "kind": "comparison_metric", "field": "Comparability_Status", "expected": "COMPARABLE"}
+      ],
+      "numerical_slot_ref": "s27",
+      "numerical_slot_field": "Candidate_Value",
+      "expected_findings": ["Report the selected comparable service direction and identify both reference and candidate cohorts."],
+      "unsupported_conclusions": ["Legacy independent-week Service_Level uses the same denominator.", "A future service target will be met."]
+    },
+    {
+      "id": "EV-06",
+      "scenario": "Baseline",
+      "max_records": 4,
+      "comparison": true,
+      "focus": "Product priority and allocation trade-offs",
+      "evidence": [
+        {"section": "risk_analysis", "source_ref": "s22", "kind": "risk", "field": "Planning_Priority", "expected": 1},
+        {"section": "risk_analysis", "source_ref": "s24", "kind": "risk", "field": "Planning_Priority", "expected": 3},
+        {"section": "scenario_comparison", "source_ref": "s28", "kind": "comparison_metric", "field": "Reference_Value", "expected": 0.875, "unit": "ratio"},
+        {"section": "scenario_comparison", "source_ref": "s28", "kind": "comparison_metric", "field": "Candidate_Value", "expected": 0.7954545454545454, "unit": "ratio"}
+      ],
+      "numerical_slot_ref": "s28",
+      "numerical_slot_field": "Candidate_Value",
+      "expected_findings": ["Discuss published priority and comparison evidence without changing allocation order or selecting an action."],
+      "unsupported_conclusions": ["The model may reorder Planning_Priority.", "Reallocating capacity is guaranteed to improve all products."]
+    },
+    {
+      "id": "EV-07",
+      "scenario": "Baseline",
+      "max_records": 2,
+      "comparison": false,
+      "focus": "Conflicting signals and missing root-cause evidence",
+      "evidence": [
+        {"section": "risk_analysis", "source_ref": "s13", "kind": "risk", "field": "Risk_Category", "expected": "At Risk"},
+        {"section": "service_analysis", "source_ref": "s9", "kind": "service", "field": "Lost_Sales_Qty", "expected": 0.0, "unit": "EA"}
+      ],
+      "numerical_slot_ref": "s9",
+      "numerical_slot_field": "Lost_Sales_Qty",
+      "expected_unselected": ["root_cause_evidence"],
+      "expected_findings": ["Keep the deterministic At Risk classification separate from zero lost sales and request investigation of unavailable root-cause detail."],
+      "unsupported_conclusions": ["Zero lost sales proves no risk.", "The exact root cause is established by unavailable evidence."]
+    },
+    {
+      "id": "EV-08",
+      "scenario": "Baseline",
+      "max_records": 2,
+      "comparison": false,
+      "focus": "Low-risk signal control: avoid unnecessary lost-sales escalation",
+      "evidence": [
+        {"section": "service_analysis", "source_ref": "s9", "kind": "service", "field": "Lost_Sales_Qty", "expected": 0.0, "unit": "EA"},
+        {"section": "risk_analysis", "source_ref": "s13", "kind": "risk", "field": "Risk_Category", "expected": "At Risk"}
+      ],
+      "numerical_slot_ref": "s9",
+      "numerical_slot_field": "Lost_Sales_Qty",
+      "expected_findings": ["Do not escalate lost sales when the published value is zero; still preserve the separate At Risk classification."],
+      "unsupported_conclusions": ["The entire scenario is low risk.", "No further investigation is needed for any product."]
+    }
+  ]
+}

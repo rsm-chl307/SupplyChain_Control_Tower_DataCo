@@ -1,0 +1,4 @@
+Plant_ID,Capacity,Capacity_Version,Provenance_Type,Factor_Version,Workload_Unit,Week
+P1,100.0,p5-low-risk-v1,SYNTHETIC_TEST,fixture,EqWU,2017-01-08
+P1,100.0,p5-low-risk-v1,SYNTHETIC_TEST,fixture,EqWU,2017-01-15
+P1,100.0,p5-low-risk-v1,SYNTHETIC_TEST,fixture,EqWU,2017-01-22

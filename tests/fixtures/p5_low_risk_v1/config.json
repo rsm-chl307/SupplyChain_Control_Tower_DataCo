@@ -1,0 +1,85 @@
+{
+  "planning_start_week": "2017-01-08",
+  "planning_end_week": "2017-01-22",
+  "quantity_step": 0,
+  "allocation_policy": "PRIORITY_NET_UNITS_BACKLOG_FIRST_WITHIN_PRODUCT",
+  "scenarios": [
+    {
+      "Scenario": "Baseline",
+      "Demand_Multiplier": 1.0,
+      "Capacity_Multiplier": 1.0,
+      "Disruption_Plants": [
+        "P1"
+      ],
+      "Disruption_Weeks": null,
+      "Backlog_Policy": "CARRY_FORWARD"
+    },
+    {
+      "Scenario": "Demand_Surge",
+      "Demand_Multiplier": 1.1,
+      "Capacity_Multiplier": 1.0,
+      "Disruption_Plants": [
+        "P1"
+      ],
+      "Disruption_Weeks": null,
+      "Backlog_Policy": "CARRY_FORWARD"
+    },
+    {
+      "Scenario": "Capacity_Disruption",
+      "Demand_Multiplier": 1.0,
+      "Capacity_Multiplier": 0.8,
+      "Disruption_Plants": [
+        "P1"
+      ],
+      "Disruption_Weeks": null,
+      "Backlog_Policy": "CARRY_FORWARD"
+    },
+    {
+      "Scenario": "Combined_Stress",
+      "Demand_Multiplier": 1.1,
+      "Capacity_Multiplier": 0.8,
+      "Disruption_Plants": [
+        "P1"
+      ],
+      "Disruption_Weeks": null,
+      "Backlog_Policy": "CARRY_FORWARD"
+    }
+  ],
+  "data_mode": "SYNTHETIC_DEMO",
+  "assumption_version": "p5-low-risk-synthetic-v1",
+  "planning_interpretation": "RETROSPECTIVE",
+  "demand_format": "ORDER_LINES",
+  "source_is_complete": true,
+  "status_eligibility": {
+    "COMPLETE": true,
+    "CANCELED": false,
+    "SUSPECTED_FRAUD": false
+  },
+  "eligibility_version": "p5-low-risk-synthetic-v1",
+  "files": {
+    "products": {
+      "path": "products.csv"
+    },
+    "plants": {
+      "path": "plants.csv"
+    },
+    "product_plant_mapping": {
+      "path": "product_plant_mapping.csv"
+    },
+    "demand": {
+      "path": "demand.csv"
+    },
+    "workload_factors": {
+      "path": "workload_factors.csv"
+    },
+    "initial_inventory": {
+      "path": "initial_inventory.csv"
+    },
+    "external_receipts": {
+      "path": "external_receipts.csv"
+    },
+    "weekly_capacity": {
+      "path": "weekly_capacity.csv"
+    }
+  }
+}

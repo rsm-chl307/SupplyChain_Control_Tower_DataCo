@@ -1,0 +1,3 @@
+Product_ID,Workload_Factor,Factor_Version,Workload_Unit,Provenance_Type
+1,2.0,fixture,EqWU,SYNTHETIC_TEST
+2,1.0,fixture,EqWU,SYNTHETIC_TEST
