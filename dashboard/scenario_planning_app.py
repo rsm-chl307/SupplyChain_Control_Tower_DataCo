@@ -29,6 +29,8 @@ if str(REPOSITORY_ROOT) not in sys.path:
 
 from dashboard.i18n import t, localize, diagnostic, current_locale
 from dashboard.display_metadata import label as display_label, help_text, METRICS, STATUS, COHORTS
+from dashboard.copilot_locale import render_copilot_locale_selector
+from dashboard.copilot_view import render as render_copilot
 
 from src.run_planning import PlanningRunError, run_csv_planning, run_planning, run_sequential_planning
 from src.planning_risk import (
@@ -1516,6 +1518,12 @@ def main() -> None:
     _capture_user_upload_state()
     st.title(t('ui.main.cd9e13535d7b'))
     st.info(t('ui.main.acf52dd61a47'))
+    workspace = st.sidebar.radio('Workspace / 工作區', ['Planning', 'Decision Copilot'],
+                                 key='ui_workspace', horizontal=True)
+    if workspace == 'Decision Copilot':
+        render_copilot_locale_selector(_apply_locale)
+        render_copilot()
+        return
     model = st.sidebar.selectbox(t('ui.main.914d526ec39a'), ["Sequential workload", "Legacy independent weeks"], key='ui_planning_model', format_func=lambda value, locale=current_locale(): localize(value, locale=locale))
     _language_sidebar(model)
     if model == "Sequential workload":

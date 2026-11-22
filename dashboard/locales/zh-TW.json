@@ -279,7 +279,7 @@
   "metric.Terminal_Horizon_Backlog.label": "期末期間來源欠單",
   "metric.Terminal_Horizon_Backlog.help": "期末尚存的期間來源欠單。",
   "metric.Service_Level.label": "服務水準（歷史獨立週模式）",
-  "metric.Service_Level.help": "歷史模式分配量／淨需求，保留歷史分母為零政策。",
+  "metric.Service_Level.help": "歷史獨立週模式分配量／淨需求，保留歷史獨立週模式的分母為零政策。",
   "metric.Allocation_Rate.label": "分配率（歷史模式）",
   "metric.Allocation_Rate.help": "歷史分配量／情境需求，不是序列模式期間服務。",
   "field.Run_ID": "規劃執行識別碼",
