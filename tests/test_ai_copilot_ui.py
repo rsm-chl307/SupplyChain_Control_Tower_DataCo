@@ -18,6 +18,7 @@ from src.ai_copilot.approval import OwnerVerifier
 from src.ai_copilot.execution_gate import LocalExecutionGate
 from src.ai_copilot.ledger import CostPolicy, CAMPAIGN_ID, ExecutionLedger
 from src.ai_copilot.provider import build_request
+from src.ai_copilot.cloud_access import password_verifier
 
 
 APP_NAME = os.environ.get('COPILOT_P4_ENTRYPOINT', 'scenario_planning_app.py')
@@ -34,11 +35,20 @@ class CopilotUITests(unittest.TestCase):
         deny = patch.object(socket.socket, 'connect', side_effect=AssertionError('No network'))
         deny.start()
         self.addCleanup(deny.stop)
+        salt = bytes(range(32))
+        fake_settings = {'AI_ACCESS_SALT_HEX': salt.hex(),
+                         'AI_ACCESS_SCRYPT_HEX': password_verifier('offline-test-password-only', salt).hex()}
+        settings_patch = patch.object(copilot_view, 'ai_settings', return_value=fake_settings)
+        settings_patch.start()
+        self.addCleanup(settings_patch.stop)
         self.app = AppTest.from_file(str(APP), default_timeout=60).run()
         self.assertFalse(self.app.exception)
 
     def enter(self):
         self.app.radio(key='ui_workspace').set_value('Decision Copilot').run()
+        if '_ai_access_until' not in self.app.session_state:
+            self.app.text_input[0].set_value('offline-test-password-only')
+            self.app.button(key='FormSubmitter:copilot_ai_access-Unlock AI preview').click().run()
         self.assertFalse(self.app.exception)
 
     def prepare(self):
