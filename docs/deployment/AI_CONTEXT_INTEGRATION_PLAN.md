@@ -1,0 +1,13 @@
+# Stage 2 — Existing supply-chain context for future AI
+
+> **Stage 5 update, 2026-11-26:** The backend AI service now caps the full serialized request at 30,000 bytes and validates all responses through the existing P1 gate. Fixed reviewed documents reject symlinked paths. This size cap is a local byte proxy, not an exact provider token count. It does not authorize live dispatch or replace the Planning Engine as numerical source of truth.
+
+> **Stage 4 implementation update, 2026-11-25:** `src/ai_copilot/cloud_question.py` now binds each bounded question and up to three validated prior turns to an exact ProviderRequest derived from the live ValidatedBrief. `cloud_response_arguments()` constructs a Responses-style structured request locally. `src/ai_copilot/cloud_knowledge.py` selects at most two bounded excerpts from reviewed KPI, risk, service and capability documents, with each full-document SHA-256 and a request digest binding the excerpts. The UI uses only FakeProvider, then validates the structured response with the existing P1 response contract. No OpenAI dispatch or Stage 5 quota was added. These reviewed documents must be included in a future release package; P5 deployment-source remediation remains a separate stage.
+
+Date: 2026-11-25 UTC. Stage 2 baseline plan with the Stage 4 Fake implementation update above; **no real request implementation or dispatch**.
+
+Reuse the existing `SyntheticHarness` → validated Brief → ProviderRequest path as the first bounded context source. Its source manifest and evidence references allow the AI response validator to distinguish published planning facts from inference. Preserve existing provider projection, response schema, source references and numerical evidence checks. The Planning Engine remains authoritative for demand, allocation, backlog, KPIs and scenarios.
+
+Future AI context may include the current scenario run's KPI definitions, demand/inventory/service/profitability risk dictionaries, capacity constraints, WP1 root-cause findings, WP2 comparison outputs and capability catalog. Select only information relevant to the user's question, with explicit provenance, data scope, units and limitations. Do not load all repository documents, raw datasets or historical production evidence into a prompt by default. Do not construct a vector database or agent framework without demonstrated need and Owner approval.
+
+Before Stage 4, inventory exact source documents and output contracts, define a stable context projection and per-source size/privacy limits, and test answer grounding against known synthetic scenarios. Missing evidence must be surfaced as a limitation. Do not use an LLM to replace deterministic calculations or treat its recommendations as executable decisions.
