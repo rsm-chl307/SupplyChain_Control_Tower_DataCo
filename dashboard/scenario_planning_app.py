@@ -29,7 +29,9 @@ if str(REPOSITORY_ROOT) not in sys.path:
 
 from dashboard.i18n import t, localize, diagnostic, current_locale
 from dashboard.display_metadata import label as display_label, help_text, METRICS, STATUS, COHORTS
-from dashboard.copilot_locale import render_copilot_locale_selector
+from dashboard.user_guide.guide_content import GuideContentError, load_sections
+from dashboard.user_guide.guide_navigation import SECTION_IDS, navigation
+from dashboard.cloud_paths import load_packaged_config, resolve_published_run
 from dashboard.copilot_view import render as render_copilot
 
 from src.run_planning import PlanningRunError, run_csv_planning, run_planning, run_sequential_planning
@@ -47,6 +49,17 @@ from src.planning_risk import (
 
 DATA_ROOT = REPOSITORY_ROOT / "data"
 PROCESSED_ROOT = DATA_ROOT / "processed"
+
+
+def _session_runtime_root() -> Path:
+    """Keep generated Cloud runs outside deployed source and apart by browser session."""
+    directory = st.session_state.get("_planning_runtime_dir")
+    if directory is None:
+        directory = tempfile.TemporaryDirectory(prefix="supply_chain_copilot_")
+        st.session_state["_planning_runtime_dir"] = directory
+    return Path(directory.name)
+
+
 PERFORMANCE_COLUMNS = {
     "Aggregation_Level",
     "Scenario",
@@ -285,12 +298,17 @@ def _run_controls() -> None:
     capacity_pct = st.sidebar.number_input(
         t('ui.run_controls.135bc0b63887'), min_value=0.0, max_value=100.0, value=20.0, step=1.0
     , key='ui_run_controls_number_input_5')
+    legacy_output_dir = PROCESSED_ROOT / "scenario_runs" / f"{start:%Y%m%d}_{end:%Y%m%d}"
+    legacy_output_exists = legacy_output_dir.exists()
+    if legacy_output_exists:
+        st.sidebar.warning(t('ui.run_controls.output_exists', path=legacy_output_dir))
     if not (PROCESSED_ROOT / "planning_snapshot.csv").exists():
         st.sidebar.info(t('ui.run_controls.0b25b0d4b035'))
         return
     plants = pd.read_csv(PROCESSED_ROOT / "planning_snapshot.csv", usecols=["Plant_ID"])["Plant_ID"].dropna().unique().tolist()
     disruption_plant = st.sidebar.selectbox(t('ui.run_controls.39b3fb4803d5'), sorted(plants), index=0, key='ui_run_controls_selectbox_6')
-    if st.sidebar.button(t('ui.run_controls.b18bba05ab1d'), type="primary", key='ui_run_controls_button_7'):
+    if st.sidebar.button(t('ui.run_controls.b18bba05ab1d'), type="primary", key='ui_run_controls_button_7',
+                          disabled=legacy_output_exists):
         try:
             outputs = run_planning(
                 DATA_ROOT,
@@ -317,7 +335,7 @@ def _overview(performance: pd.DataFrame, scenario: pd.DataFrame) -> None:
         & (performance["Scenario"] == selected)
     ]
     if not plant_rows.empty and px is not None:
-        fig = _plotly_bar(plant_rows, x="Plant_ID", y="Capacity_Utilization", color="Performance_Status", title="Capacity utilization by plant")
+        fig = _plotly_bar(plant_rows, x="Plant_ID", y="Capacity_Utilization", color="Performance_Status", title=t("display.6cc1ad870b23"))
         fig.update_yaxes(tickformat=".0%")
         st.plotly_chart(fig, use_container_width=True)
 
@@ -365,7 +383,7 @@ def _comparison(performance: pd.DataFrame) -> None:
     )
     fig = _plotly_bar(
         chart, x="Scenario", y="Value", color="Scenario", facet_col="KPI", facet_col_wrap=2,
-        title="Scenario KPI levels (independent scales)",
+        title=t("display.bdff9b71cf20"),
     )
     fig.update_yaxes(tickformat=".0%")
     st.plotly_chart(fig, use_container_width=True)
@@ -379,7 +397,7 @@ def _comparison(performance: pd.DataFrame) -> None:
     changes = changes[changes["Scenario"].ne("Baseline")]
     change_fig = _plotly_bar(
         changes, x="KPI", y="Change", color="Scenario", barmode="group",
-        title="Scenario impact versus Baseline (percentage points)",
+        title=t("display.2ace4a80635a"),
     )
     change_fig.update_yaxes(tickformat="+.2%")
     st.plotly_chart(change_fig, use_container_width=True)
@@ -388,7 +406,7 @@ def _comparison(performance: pd.DataFrame) -> None:
         st.write(t('ui.render_readiness_report.9a4a817443e2' , p0=_display_scenario_insight(insight)))
     backlog_fig = _plotly_bar(
         comparison, x="Scenario", y="Total_Backlog", color="Scenario",
-        title="Backlog impact by scenario",
+        title=t("display.1bb929c3d0bc"),
     )
     st.plotly_chart(backlog_fig, use_container_width=True)
 
@@ -572,6 +590,7 @@ def _build_upload_config(*, uploads: dict, mappings: dict, demand_format: str, s
             }
 
     assumptions_out: dict[str, object] = {}
+    capacity_calibration: dict[str, object] | None = None
     if uploads.get("products") is not None:
         if "Quantity_Unit" not in mappings.get("products", {}) and assumptions["quantity_unit"].strip():
             assumptions_out["quantity_unit"] = assumptions["quantity_unit"].strip()
@@ -604,7 +623,7 @@ def _build_upload_config(*, uploads: dict, mappings: dict, demand_format: str, s
             errors.append("Upload External receipts or explicitly declare that no external receipts are modeled.")
     if uploads.get("weekly_capacity") is None:
         if assumptions["capacity_calibration"]:
-            assumptions_out["capacity_calibration"] = {
+            capacity_calibration = {
                 "start_week": start_week.isoformat(), "end_week": end_week.isoformat(),
                 "target_utilization": float(assumptions["target_utilization"]),
                 "capacity_version": "ui-synthetic-calibration-v1",
@@ -630,6 +649,9 @@ def _build_upload_config(*, uploads: dict, mappings: dict, demand_format: str, s
              "Disruption_Plants": disrupted_plants, "Disruption_Weeks": None, "Backlog_Policy": backlog_policy},
         ],
     }
+    if capacity_calibration is not None:
+        # The CSV adapter reads this established top-level configuration key.
+        config["capacity_calibration"] = capacity_calibration
     if status_eligibility:
         config["status_eligibility"] = status_eligibility
         config["eligibility_version"] = "streamlit-status-map-v1"
@@ -695,7 +717,7 @@ def _write_upload_inputs(upload_dir: Path, config: dict, uploads: dict) -> None:
 def _user_csv_upload_workflow() -> None:
     """Upload, map, validate, and execute user CSVs through the existing runner."""
     st.subheader(t('ui.user_csv_upload_workflow.9cc5634cda5d'))
-    st.caption(t('ui.user_csv_upload_workflow.7f92cfa151a3'))
+    st.markdown(t('ui.user_csv_upload_workflow.7f92cfa151a3'))
     demand_format = st.radio(t('ui.user_csv_upload_workflow.b95a1f51b901'), ["WEEKLY", "ORDER_LINES"], horizontal=True, key="upload_demand_format", format_func=lambda value, locale=current_locale(): localize(value, locale=locale))
     required_uploads = {"products", "plants", "product_plant_mapping", "demand"}
     st.markdown(t('ui.user_csv_upload_workflow.2098ebab834b'))
@@ -732,7 +754,9 @@ def _user_csv_upload_workflow() -> None:
 
     status_rows = [
         {"Dataset": localize(label), "Requirement": localize("Required" if dataset in required_uploads else "Optional / assumption may replace"),
-         "Status": localize("Uploaded" if uploads[dataset] is not None else "Missing")}
+         "Status": localize("Uploaded" if uploads[dataset] is not None else "Missing"),
+         t("upload.next.heading"): t("upload.next.present" if uploads[dataset] is not None else
+                                    "upload.next.required" if dataset in required_uploads else "upload.next.optional")}
         for dataset, (label, _, _) in CSV_INPUT_SCHEMAS.items()
     ]
     _display_dataframe(pd.DataFrame(status_rows), hide_index=True, use_container_width=True)
@@ -753,7 +777,7 @@ def _user_csv_upload_workflow() -> None:
         status_eligibility: dict[str, bool] = {}
         if status_values:
             st.markdown(t('ui.user_csv_upload_workflow.b5718aaa4a47'))
-            st.caption(t('ui.user_csv_upload_workflow.74f27912d7a7'))
+            st.markdown(t('ui.user_csv_upload_workflow.74f27912d7a7'))
             for index, status in enumerate(status_values):
                 choice = st.selectbox(t('ui.user_csv_upload_workflow.7f61c6cb867b' , p0=status), ["Choose…", "Qualified", "Excluded"],
                                       key=f"eligibility_{index}_{status}", format_func=lambda value, locale=current_locale(): localize(value, locale=locale))
@@ -761,7 +785,8 @@ def _user_csv_upload_workflow() -> None:
                     status_eligibility[status] = choice == "Qualified"
         elif demand_format == "WEEKLY" and demand_preview is not None:
             already_qualified = st.checkbox(t('ui.user_csv_upload_workflow.49d6ae885be6'), value=False, key='upload_ui_user_csv_upload_workflow_checkbox_43')
-        elif demand_format == "ORDER_LINES" and demand_preview is not None:
+
+        if demand_format == "ORDER_LINES" and demand_preview is not None:
             source_is_complete = st.checkbox(t('ui.user_csv_upload_workflow.2982f08bede9'), value=False,
                                                help=t('ui.user_csv_upload_workflow.12ba9cf2e711'), key='upload_ui_user_csv_upload_workflow_checkbox_45')
 
@@ -770,34 +795,35 @@ def _user_csv_upload_workflow() -> None:
         horizon_widget_key = f"{demand_format}_{start_default.isoformat()}_{end_default.isoformat()}"
         date_cols = st.columns(2)
         with date_cols[0]:
-            start_week = st.date_input(t('ui.user_csv_upload_workflow.3e0fd01065a6'), value=start_default, key=f"upload_start_week_{horizon_widget_key}")
+            start_week = st.date_input(t('ui.user_csv_upload_workflow.3e0fd01065a6'), value=start_default,
+                                       key=f"upload_start_week_{horizon_widget_key}", help=t('planning.help.date_start'))
         with date_cols[1]:
-            end_week = st.date_input(t('ui.user_csv_upload_workflow.c2e1866609b6'), value=end_default, key=f"upload_end_week_{horizon_widget_key}")
-        interpretation = st.selectbox(t('ui.user_csv_upload_workflow.f1b413244e48'), ["USER_PROVIDED_PLAN", "RETROSPECTIVE"], key="upload_interpretation", format_func=lambda value, locale=current_locale(): localize(value, locale=locale))
-        assumption_version = st.text_input(t('ui.user_csv_upload_workflow.838b1873c8ea'), value="streamlit-user-upload-v1", key="upload_assumption_version")
-        quantity_step = st.number_input(t('ui.user_csv_upload_workflow.b0fa4241919e'), min_value=0.0, value=0.0, step=1.0, key="upload_quantity_step")
-        surge_pct = st.number_input(t('ui.user_csv_upload_workflow.363490b8991e'), min_value=0.0, value=10.0, step=1.0, key="upload_surge_pct")
-        disruption_pct = st.number_input(t('ui.user_csv_upload_workflow.8571395c8005'), min_value=0.0, max_value=100.0, value=20.0, step=1.0, key="upload_disruption_pct")
+            end_week = st.date_input(t('ui.user_csv_upload_workflow.c2e1866609b6'), value=end_default,
+                                     key=f"upload_end_week_{horizon_widget_key}", help=t('planning.help.date_end'))
+        interpretation = st.selectbox(t('ui.user_csv_upload_workflow.f1b413244e48'), ["USER_PROVIDED_PLAN", "RETROSPECTIVE"], key="upload_interpretation", format_func=lambda value, locale=current_locale(): localize(value, locale=locale), help=t('planning.help.demand_basis'))
+        assumption_version = st.text_input(t('ui.user_csv_upload_workflow.838b1873c8ea'), value="streamlit-user-upload-v1", key="upload_assumption_version", help=t('planning.help.assumption_version'))
+        quantity_step = st.number_input(t('ui.user_csv_upload_workflow.b0fa4241919e'), min_value=0.0, value=0.0, step=1.0, key="upload_quantity_step", help=t('planning.help.quantity_step'))
+        surge_pct = st.number_input(t('ui.user_csv_upload_workflow.363490b8991e'), min_value=0.0, value=10.0, step=1.0, key="upload_surge_pct", help=t('planning.help.surge'))
+        disruption_pct = st.number_input(t('ui.user_csv_upload_workflow.8571395c8005'), min_value=0.0, max_value=100.0, value=20.0, step=1.0, key="upload_disruption_pct", help=t('planning.help.disruption'))
         plants = _preview_identifiers(previews.get("plants"), mappings.get("plants", {}).get("Plant_ID"))
         plants_key = "_".join(plants) or "none"
-        disrupted_plants = st.multiselect(t('ui.user_csv_upload_workflow.955fc3a56a5a'), plants, default=plants[:1], key=f"upload_disrupted_plants_{plants_key}")
-        backlog_policy = st.selectbox(t('ui.user_csv_upload_workflow.3d234b7e424e'), ["CARRY_FORWARD", "LOST_SALES"], key="upload_backlog_policy", format_func=lambda value, locale=current_locale(): localize(value, locale=locale))
+        disrupted_plants = st.multiselect(t('ui.user_csv_upload_workflow.955fc3a56a5a'), plants, default=plants[:1], key=f"upload_disrupted_plants_{plants_key}", help=t('planning.help.plants'))
+        backlog_policy = st.selectbox(t('ui.user_csv_upload_workflow.3d234b7e424e'), ["CARRY_FORWARD", "LOST_SALES"], key="upload_backlog_policy", format_func=lambda value, locale=current_locale(): localize(value, locale=locale), help=t('planning.help.backlog_policy'))
 
         with st.expander(t('ui.user_csv_upload_workflow.53f5e4818535')):
-            st.caption(t('ui.user_csv_upload_workflow.984844251384'))
-            quantity_unit = st.text_input(t('ui.user_csv_upload_workflow.52a08ee9a085'), value="", key="upload_quantity_unit")
+            st.markdown(t('ui.user_csv_upload_workflow.984844251384'))
+            quantity_unit = st.text_input(t('ui.user_csv_upload_workflow.52a08ee9a085'), value="", key="upload_quantity_unit", help=t('planning.help.quantity_unit'))
             use_priority = st.checkbox(t('ui.user_csv_upload_workflow.350885b217bf'), value=False, key="upload_use_priority")
-            assumed_priority = st.selectbox(t('ui.user_csv_upload_workflow.c7bb626a504f'), [1, 2, 3], index=1, key="upload_assumed_priority", format_func=lambda value, locale=current_locale(): localize(value, locale=locale))
+            assumed_priority = st.selectbox(t('ui.user_csv_upload_workflow.c7bb626a504f'), [1, 2, 3], index=1, key="upload_assumed_priority", format_func=lambda value, locale=current_locale(): localize(value, locale=locale), help=t('planning.help.priority'))
             use_factor = st.checkbox(t('ui.user_csv_upload_workflow.0d92b4c13ed0'), value=False, key="upload_use_factor")
-            uniform_factor = st.number_input(t('ui.user_csv_upload_workflow.540c922746b5'), min_value=0.000001, value=1.0, step=0.25, key="upload_uniform_factor")
-            workload_unit = st.text_input(t('ui.user_csv_upload_workflow.2cfdc8a6fe8f'), value="EqWU", key="upload_workload_unit")
+            uniform_factor = st.number_input(t('ui.user_csv_upload_workflow.540c922746b5'), min_value=0.000001, value=1.0, step=0.25, key="upload_uniform_factor", help=t('planning.help.factor'))
+            workload_unit = st.text_input(t('ui.user_csv_upload_workflow.2cfdc8a6fe8f'), value="EqWU", key="upload_workload_unit", help=t('planning.help.workload_unit'))
             zero_inventory = st.checkbox(t('ui.user_csv_upload_workflow.92ca2fc427c4'), value=False, key="upload_zero_inventory")
             zero_backlog = st.checkbox(t('ui.user_csv_upload_workflow.99caf326c4ba'), value=False, key="upload_zero_backlog")
             no_receipts = st.checkbox(t('ui.user_csv_upload_workflow.c67ea6e1d864'), value=False, key="upload_no_receipts")
-            calibrate_capacity = st.checkbox(t('ui.user_csv_upload_workflow.e10917b8fa24'), value=False, key="upload_calibrate_capacity")
-            target_utilization = st.number_input(t('ui.user_csv_upload_workflow.a73f263428d9'), min_value=0.01, max_value=1.0, value=0.75, step=0.05, key="upload_target_utilization")
+            calibrate_capacity = st.checkbox(t('ui.user_csv_upload_workflow.e10917b8fa24'), value=False, key="upload_calibrate_capacity", help=t('planning.help.capacity_calibration'))
+            target_utilization = st.number_input(t('ui.user_csv_upload_workflow.a73f263428d9'), min_value=0.01, max_value=1.0, value=0.75, step=0.05, key="upload_target_utilization", help=t('planning.help.capacity_target'))
 
-        _language_form()
         validate_clicked = st.form_submit_button(t('ui.user_csv_upload_workflow.9e85075f0c01'))
         run_clicked = st.form_submit_button(t('ui.user_csv_upload_workflow.6e3fe7846156'), type="primary")
 
@@ -827,8 +853,8 @@ def _user_csv_upload_workflow() -> None:
     if run_clicked and report.get("Status") != "READY":
         st.warning(t('ui.user_csv_upload_workflow.9c7c07f5dd1a'))
     if run_clicked and report.get("Status") == "READY":
-        output_root = REPOSITORY_ROOT / "tmp" / "planning_upgrade_runs"
-        input_root = REPOSITORY_ROOT / "tmp"
+        input_root = _session_runtime_root()
+        output_root = input_root / "planning_upgrade_runs"
         input_root.mkdir(parents=True, exist_ok=True)
         try:
             with tempfile.TemporaryDirectory(prefix="control_tower_upload_", dir=input_root) as temporary:
@@ -836,6 +862,7 @@ def _user_csv_upload_workflow() -> None:
                 _write_upload_inputs(upload_dir, config, uploads)
                 paths = run_csv_planning(config, inputs_dir=upload_dir, output_root=output_root)
             st.session_state["sequential_run_dir"] = str(paths["run_manifest"].parent)
+            st.session_state["ui_published_run_path"] = st.session_state["sequential_run_dir"]
             st.success(t('ui.user_csv_upload_workflow.126182d571c2'))
             st.caption(t('ui.user_csv_upload_workflow.5bfc977fc3da' , p0=paths['run_manifest'].parent.name))
             st.download_button(t('ui.user_csv_upload_workflow.9632aff0f596'), paths["run_manifest"].read_bytes(),
@@ -1328,9 +1355,9 @@ def _scenario_tradeoff_analysis(run_dir: Path, manifest: dict) -> None:
 
 def _sequential_views() -> None:
     """Expose the upgraded prepared outputs without another dashboard redesign."""
-    st.caption(t('ui.sequential_views.0844b57f1d86'))
-    st.caption(t("workflow.prepare"))
-    st.caption(t("workflow.analyze"))
+    st.markdown(t('ui.sequential_views.0844b57f1d86'))
+    st.markdown(t("workflow.prepare"))
+    st.markdown(t("workflow.analyze"))
     st.caption(t("workflow.views"))
     input_method = st.radio(t('ui.sequential_views.523611cca3e9'), ["Upload CSV data", "Use existing JSON configuration"], horizontal=True, key='ui_planning_input_method', format_func=lambda value, locale=current_locale(): localize(value, locale=locale))
     if input_method == "Upload CSV data":
@@ -1340,16 +1367,15 @@ def _sequential_views() -> None:
         config_text = st.sidebar.text_input(t('ui.sequential_views.8ac82fd8e33c'), value="examples/planning/synthetic_demo/config.json", key='ui_sequential_config_path')
         if st.sidebar.button(t('ui.sequential_views.674b67e4a20b'), type="primary", key='ui_sequential_views_button_10'):
             try:
-                path = Path(config_text)
-                path = path if path.is_absolute() else REPOSITORY_ROOT / path
-                configuration = json.loads(path.read_text())
+                path, configuration = load_packaged_config(config_text, REPOSITORY_ROOT)
                 if "data_mode" in configuration:
                     paths = run_csv_planning(configuration, inputs_dir=path.parent,
-                                             output_root=REPOSITORY_ROOT / "tmp/planning_upgrade_runs")
+                                             output_root=_session_runtime_root() / "planning_upgrade_runs")
                 else:
                     paths = run_sequential_planning(DATA_ROOT, configuration, inputs_dir=path.parent,
-                                                   output_root=REPOSITORY_ROOT / "tmp/planning_upgrade_runs")
+                                                   output_root=_session_runtime_root() / "planning_upgrade_runs")
                 st.session_state["sequential_run_dir"] = str(paths["run_manifest"].parent)
+                st.session_state["ui_published_run_path"] = st.session_state["sequential_run_dir"]
                 st.sidebar.success(t('ui.sequential_views.c4663e34ece9'))
             except (OSError, ValueError, KeyError, TypeError) as exc:
                 st.sidebar.error(diagnostic(str(exc)))
@@ -1361,8 +1387,7 @@ def _sequential_views() -> None:
         st.info(t('ui.sequential_views.65e8612e1a67'))
         return
     try:
-        run_dir = Path(selected_path)
-        run_dir = run_dir if run_dir.is_absolute() else REPOSITORY_ROOT / run_dir
+        run_dir = resolve_published_run(selected_path, REPOSITORY_ROOT, _session_runtime_root())
         outputs = load_sequential_outputs(run_dir, include_evidence=True)
         manifest = json.loads((run_dir / "run_manifest.json").read_text())
     except (OSError, ValueError, KeyError) as exc:
@@ -1463,16 +1488,16 @@ def _apply_locale(request_key):
                 "investigation_", "risk_", "detail_", "ui_", "sequential_")
     snapshot = {key: value for key, value in st.session_state.items()
                 if key.startswith(prefixes) and not key.startswith("upload_widget_")
-                and key not in {"ui_locale", "ui_locale_restore", "ui_language_request", "upload_language_request", request_key}
+                and key not in {"ui_locale", "ui_locale_restore", "ui_language_request", request_key}
                 and "_button_" not in key
+                and key not in {"ui_user_guide_toggle", "ui_user_guide_close"}
+                and not key.startswith("ui_guide_nav_")
                 and "_download_" not in key
                 and not key.startswith("wp2_investigate_")}
     st.session_state["ui_locale_restore"] = snapshot
     requested = st.session_state.get(request_key, "en")
     st.session_state["ui_locale"] = requested if requested in ("en", "zh-TW") else "en"
     st.session_state["ui_language_request"] = st.session_state["ui_locale"]
-    st.session_state["upload_language_request"] = st.session_state["ui_locale"]
-    st.session_state.setdefault(_USER_UPLOAD_WIDGET_STATE_KEY, {})["upload_language_request"] = st.session_state["ui_locale"]
 
 
 def _restore_locale_state():
@@ -1480,27 +1505,92 @@ def _restore_locale_state():
         st.session_state[key] = value
 
 
-def _language_form():
-    st.caption(t("locale.form_help"))
-    if "upload_language_request" not in st.session_state:
-        st.session_state["upload_language_request"] = current_locale()
-    st.selectbox(t("locale.label"), ["en", "zh-TW"], key="upload_language_request",
-                 format_func=lambda value: "English" if value == "en" else "繁體中文")
-    st.form_submit_button(t("locale.apply"), on_click=_apply_locale,
-                          args=("upload_language_request",))
+def _language_selector():
+    """Render the global locale control and User Guide entry in the header."""
+    st.session_state.setdefault("ui_language_request", current_locale())
+    _, selector_column, guide_column = st.columns([5, 1.45, 1.35], gap="small")
+    with selector_column:
+        st.selectbox(t("locale.label"), ["en", "zh-TW"], key="ui_language_request",
+                     format_func=lambda value: "English" if value == "en" else "繁體中文",
+                     on_change=_apply_locale, args=("ui_language_request",),
+                     label_visibility="collapsed")
+    with guide_column:
+        st.button(t("guide.entry"), key="ui_user_guide_toggle", on_click=_toggle_user_guide,
+                  type="primary" if st.session_state.get("ui_user_guide_open", False) else "secondary")
 
 
-def _language_sidebar(model):
-    # A sidebar rerun cannot safely flush unsubmitted browser form buffers.
-    # In CSV mode the selector is inside the existing form instead.
-    if model == "Sequential workload" and st.session_state.get(
-            "ui_planning_input_method", "Upload CSV data") == "Upload CSV data":
-        st.sidebar.caption(t("locale.sidebar_help"))
-    else:
-        st.session_state.setdefault("ui_language_request", current_locale())
-        st.sidebar.selectbox(t("locale.label"), ["en", "zh-TW"], key="ui_language_request",
-                             format_func=lambda value: "English" if value == "en" else "繁體中文",
-                             on_change=_apply_locale, args=("ui_language_request",))
+def _toggle_user_guide():
+    is_open = not st.session_state.get("ui_user_guide_open", False)
+    st.session_state["ui_user_guide_open"] = is_open
+    if is_open:
+        st.session_state.setdefault("ui_guide_section", SECTION_IDS[0])
+
+
+def _close_user_guide():
+    st.session_state["ui_user_guide_open"] = False
+
+
+def _select_guide_section(section_id: str):
+    if section_id in SECTION_IDS:
+        st.session_state["ui_guide_section"] = section_id
+
+
+def _render_user_guide() -> None:
+    """Render the guide without unmounting the app or its Planning form."""
+    if not st.session_state.get("ui_user_guide_open", False):
+        return
+    locale = current_locale()
+    try:
+        sections = load_sections(locale)
+    except GuideContentError as exc:
+        message_key = "guide.missing_translation" if "Missing guide translation" in str(exc) else "guide.content_error"
+        st.error(t(message_key))
+        return
+
+    content_by_id = {section.section_id: section for section in sections}
+    active_id = st.session_state.get("ui_guide_section", SECTION_IDS[0])
+    if active_id not in content_by_id:
+        active_id = SECTION_IDS[0]
+        st.session_state["ui_guide_section"] = active_id
+    section = content_by_id[active_id]
+    with st.container(border=True):
+        st.markdown('<div id="ui-v12-guide-top"></div>', unsafe_allow_html=True)
+        title_column, close_column = st.columns([5, 1])
+        with title_column:
+            st.subheader(t("guide.title"))
+            st.caption(t("guide.introduction"))
+        with close_column:
+            st.button(t("guide.close"), key="ui_user_guide_close", on_click=_close_user_guide)
+
+        toc_column, content_column = st.columns([1.15, 3], gap="large", vertical_alignment="top")
+        with toc_column:
+            st.markdown(f"#### {t('guide.toc')}")
+            for index, (section_id, label) in enumerate(navigation(locale), start=1):
+                st.button(f"{index:02d}. {label}", key=f"ui_guide_nav_{section_id}",
+                          on_click=_select_guide_section, args=(section_id,),
+                          type="primary" if section_id == active_id else "secondary",
+                          use_container_width=True)
+            st.caption(t("guide.active", section=section.title))
+        with content_column:
+            st.markdown(f"### {section.title}")
+            st.markdown(section.introduction)
+            for subsection in section.subsections:
+                with st.expander(subsection.title, expanded=False):
+                    st.markdown(subsection.markdown)
+            st.markdown(f"[↑ {t('guide.back_to_top')}](#ui-v12-guide-top)")
+
+
+def _planning_model_label(value: str, locale: str | None = None) -> str:
+    key = "model.sequential.label" if value == "Sequential workload" else "model.legacy.label"
+    return t(key, locale=locale)
+
+
+def _planning_model_help(value: str) -> str:
+    key = "model.sequential.help" if value == "Sequential workload" else "model.legacy.help"
+    return t(key)
+
+
+def _display_metadata_sidebar():
     st.caption(t("display.raw"))
     with st.expander(t("display.technical")):
         _display_dataframe(pd.DataFrame([
@@ -1516,16 +1606,22 @@ def main() -> None:
     st.set_page_config(page_title="Scenario Planning Decision Support", layout="wide")
     _restore_locale_state()
     _capture_user_upload_state()
+    _language_selector()
     st.title(t('ui.main.cd9e13535d7b'))
     st.info(t('ui.main.acf52dd61a47'))
+    _render_user_guide()
     workspace = st.sidebar.radio('Workspace / 工作區', ['Planning', 'Decision Copilot'],
                                  key='ui_workspace', horizontal=True)
     if workspace == 'Decision Copilot':
-        render_copilot_locale_selector(_apply_locale)
         render_copilot()
         return
-    model = st.sidebar.selectbox(t('ui.main.914d526ec39a'), ["Sequential workload", "Legacy independent weeks"], key='ui_planning_model', format_func=lambda value, locale=current_locale(): localize(value, locale=locale))
-    _language_sidebar(model)
+    with st.sidebar:
+        model = st.selectbox(t('ui.main.914d526ec39a'), ["Sequential workload", "Legacy independent weeks"],
+                             key='ui_planning_model',
+                             format_func=lambda value, locale=current_locale(): _planning_model_label(value, locale),
+                             help=_planning_model_help(st.session_state.get('ui_planning_model', 'Sequential workload')))
+        st.markdown(_planning_model_help(model))
+        _display_metadata_sidebar()
     if model == "Sequential workload":
         _sequential_views()
         return

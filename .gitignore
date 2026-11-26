@@ -14,3 +14,10 @@ venv/
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# Local credentials and deployment staging
+.streamlit/secrets.toml
+.env
+.env.*
+!*.env.example
+/deployment_source/
