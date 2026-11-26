@@ -15,3 +15,7 @@ Date: 2026-11-25 UTC. Verification is **local simulation**, not Streamlit Commun
 | Windows independence | PASS for normal UI import/startup | Public Streamlit entrypoint started with no Windows Worker, Credential Manager or Docker command. Local P5 modules remain in development repository. |
 
 Actual Cloud App settings, deployment logs, public visibility, deployed SHA, sleep/wake behavior and browser UAT require Owner-controlled deployment verification at a later authorized stage. Local health 200 does not establish those results.
+
+## Incremental sync verification — 2026-11-26
+
+Cloud entrypoint and guide integration: 20/20 focused working-tree tests passed. The staged-only checkout passed 8/8 Cloud path/runtime tests and a no-Secret startup import plus bilingual guide load. The two dashboard locale files were included with the entrypoint because it uses their new keys. Commit `fb1d5793475408e501e05f4003f46757af040bab` was pushed and confirmed by a fresh fetch. No Cloud deployment or Python 3.12 qualification was performed.

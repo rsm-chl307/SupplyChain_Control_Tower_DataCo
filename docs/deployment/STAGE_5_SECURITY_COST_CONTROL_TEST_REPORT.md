@@ -31,3 +31,7 @@ These suites overlap and are **not** summed as unique tests. An earlier UI run p
 Actual Streamlit Community Cloud runtime, Python 3.12, real Cloud Secrets, OpenAI authentication/usage/billing, exact model token count, global multi-instance quotas, durable spend ceiling, provider-side hard spending limits and live browser behavior were not tested. P5 deployment-source remediation is separately scoped. Existing Streamlit deprecation/widget warnings did not fail tests.
 
 Final static review: `git diff --check` passed; eight relevant Python files passed AST parsing; a targeted Stage 5 source/UI/report scan found **0** API-key/private-key pattern hits; `REAL_PROVIDER_DISPATCH_LOCKED=True` remains set. New untracked Stage 5 files had no trailing whitespace. **Offline Stage 5 tests: PASS; production readiness: limited.**
+
+## Incremental sync verification — 2026-11-26
+
+AI access and credential adapter tests passed 9/9 in working tree and staged-only checkout. The Windows credential selection test uses a synthetic module so the Cloud security batch does not depend on unpublished P5/Windows files. Commit `1a50ff5dcd197477b24774578efcf5c7dadc3e85` was pushed and confirmed by a fresh fetch. AI core affected security/service tests also passed 16/16 after boundary fixes. No real API call or Secret access occurred.

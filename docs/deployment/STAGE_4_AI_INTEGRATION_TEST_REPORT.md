@@ -30,3 +30,7 @@ Executed commands and results:
 The suites overlap; these counts are reported per command and are not summed as unique tests. Final `git diff --check`, six-module AST parse, local Markdown link check and new-code key-pattern scan all passed. Streamlit's existing `use_container_width` deprecation warnings appeared during AppTest but did not fail assertions.
 
 Python 3.12 and actual Streamlit Community Cloud are unavailable in this environment. Fake tests cannot prove a real OpenAI response, paid billing or production Secret isolation. Stage 5 and release preparation remain separately authorized. **Stage 4 Fake integration: PASS WITH LIMITATIONS; ready for Owner review before Stage 5.**
+
+## Incremental sync verification — 2026-11-26
+
+The combined Stage 4–6 AI integration suite passed 43/43 in the working tree before isolated-checkout review. Isolation exposed old-provider imports in Cloud tests and a local Owner gate request type mismatch. Those boundaries were corrected within the AI core batch; affected tests passed 16/16 in both working tree and staged-only checkout. Commit `cf313b182962dff85e8f4a2bb22d7dd807baab39` was pushed and confirmed by a fresh fetch. No real provider request was made.
