@@ -136,7 +136,7 @@ flowchart LR
 | F07 | B / Sequential Planning 執行 | Implemented／已實作 |
 | F08 | B / 期初庫存與期初欠單 | Implemented／已實作 |
 | F09 | B / 外部到貨與庫存轉移 | Implemented／已實作 |
-| F10 | B / 工作負荷與產能 | Partial／後端已實作，UI calibration 設定傳遞待修 |
+| F10 | B / 工作負荷與產能 | 已實作但有限制／UI calibration 傳遞已於 UI V1.2 驗證 |
 | F11 | B / 受限產能分配 | Implemented／已實作 |
 | F12 | B / 欠單政策 | Implemented／已實作 |
 | F13 | C / 情境生成與執行 | Implemented／已實作 |
@@ -228,7 +228,7 @@ flowchart LR
 | Outputs | Sources、Assumptions、Derived_Values、Errors、Warnings、Unavailable_Capabilities。 |
 | Business Interpretation | READY 表示通過程式契約，並非商業數據已由外部稽核。 |
 | Dependencies | F02 / F03 |
-| Limitations | 失敗時停止，並非一次列出所有後續錯誤；不自動修補資料。UI 合成 capacity fallback 的設定位置不一致，見 L11。 |
+| Limitations | 失敗時停止，並非一次列出所有後續錯誤；不自動修補資料。UI 合成 capacity calibration 傳遞已於 V1.2 驗證，證據見 L11。 |
 | Implementation Status | Implemented／已實作 |
 | Source Reference | [src/csv_planning_inputs.py](../src/csv_planning_inputs.py) — `load_csv_planning_inputs`; [dashboard/scenario_planning_app.py](../dashboard/scenario_planning_app.py) — `_validate_uploaded_config`; [dashboard/scenario_planning_app.py](../dashboard/scenario_planning_app.py) — `_render_readiness_report` |
 
@@ -336,8 +336,8 @@ flowchart LR
 | Outputs | workload_factors、capacity_baseline、capacity_pools。 |
 | Business Interpretation | 合成 capacity 並非量測產能；100% utilization 本身不等於 shortage。 |
 | Dependencies | F05 / F06 |
-| Limitations | 不支援 plant-specific factor；一組 compatible factor version／unit。UI 將 recipe 放 assumptions.capacity_calibration，但 adapter 讀頂層 capacity_calibration（L11）；無 capacity CSV 的 UI fallback 不可列為完整可用。後端 JSON 校準仍已實作。 |
-| Implementation Status | Partial／後端已實作，UI calibration 設定傳遞待修 |
+| Limitations | 不支援 plant-specific factor；一組 compatible factor version／unit。合成產能依需求校準，並非實測工廠產能。定向 UI V1.2 驗證確認既有 UI recipe 透過頂層 capacity_calibration 傳入 adapter，且合成 adapter 達 READY。 |
+| Implementation Status | 已實作但有限制；UI recipe 傳遞已於 UI V1.2 驗證 |
 | Source Reference | [src/workload_model.py](../src/workload_model.py) — `calibrate_workload_capacity`; [src/workload_model.py](../src/workload_model.py) — `validate_workload_factors`; [dashboard/scenario_planning_app.py](../dashboard/scenario_planning_app.py) — `_build_upload_config`; [src/csv_planning_inputs.py](../src/csv_planning_inputs.py) — `load_csv_planning_inputs` |
 
 ### F11 — 受限產能分配
@@ -899,7 +899,7 @@ erDiagram
 | 必要輸入 | 四個必要檔、供給／capacity／factor 或明示假設、完整 horizon。 |
 | 步驟 | 上傳→mapping→資格分類→週日／policy／scenarios→Validate inputs→解 BLOCKED→Validate and run planning。 |
 | 輸出／依賴 | READY 後產生唯一 Run、12 CSV、manifest 與 results；F01–F16。 |
-| 常見錯誤／限制 | 不要把缺週當零、把 assumed priority／capacity 當事實；LOST_SALES 不可帶非零 opening backlog。 UI 合成 capacity fallback 有 L11 限制，請提供 capacity CSV 或用 JSON。 |
+| 常見錯誤／限制 | 不要把缺週當零、把 assumed priority／capacity 當事實；LOST_SALES 不可帶非零 opening backlog。合成產能是依需求校準的假設，並非實測產能。 |
 
 ### Workflow B — 分析既有情境
 
@@ -1001,8 +1001,8 @@ CSV outputs 與 configuration 是檔案契約，不是網路服務。沒有認�
 | L07 | 匯出與來源留存 | Implemented／受限 | CSV／JSON，不提供 XLSX/PDF/ZIP；無自動來源封存；upload temp 清除後 raw source 可 unavailable。 |
 | L08 | 高階規劃與整合 | Not implemented／未實作 | 無 forecasting、optimization、跨廠替代、BOM、lead time、ERP 寫入、HTTP business API、排程 automation、AI。 |
 | L09 | 歷史文件衝突 | Documented／需按程式解讀 | readme.md 仍寫 upload wizard deferred，但 UI 已存在；Route B WP 編號與後來 WP1/WP2 不同；歷史 monitoring KPI 不當成 Sequential KPI。 |
-| L10 | ORDER_LINES UI completeness | Partial／靜態疑點待定向驗證 | completeness checkbox 位於 status_values 的 elif 分支；有效 ORDER_LINES 通常已有 Status，因此 UI 可能無法勾 source_is_complete。JSON 可明示；本次不修也不聲稱重現失敗。 |
-| L11 | UI 合成產能校準傳遞 | Partial／靜態確認介面不一致，未執行重現 | UI _build_upload_config 寫 assumptions.capacity_calibration；load_csv_planning_inputs 讀頂層 config.capacity_calibration。未提供 weekly_capacity 的 UI fallback 因而不應承諾可用；請提供 capacity CSV，或在 JSON 頂層明確設定校準。後端功能存在，本次不修程式。 |
+| L10 | ORDER_LINES UI completeness | 已於 UI V1.2 修正 | 完整擷取聲明現在獨立於需求狀態分類顯示；既有 `source_is_complete` 契約與驗證規則不變。定向 AppTest 確認 Status 有值時仍看得到聲明欄位。 |
+| L11 | UI 合成產能校準傳遞 | 已於 UI V1.2 修正 | 既有 UI recipe 改以 adapter 要求的頂層 `capacity_calibration` 傳遞。合成 demo adapter 驗證達 READY，並標示 `SYNTHETIC_DEMAND_CALIBRATED`；engine 公式與校準規則不變。 |
 
 <a id="section-12"></a>
 
@@ -1140,7 +1140,7 @@ Fallback：所選 locale → en → 顯示 `[missing:key]` 並記錄開發診斷
 
 [tmp/wp2_acceptance/final_full_suite.log](../tmp/wp2_acceptance/final_full_suite.log); [tmp/wp2_acceptance/final_verification.json](../tmp/wp2_acceptance/final_verification.json); [docs/wp2_implementation_progress.md](../docs/wp2_implementation_progress.md)
 
-**仍需調查／未驗證：** ORDER_LINES completeness checkbox 的可達性（L10）；未做 browser acceptance；PBIX refresh 未驗證；原 WP2–WP4 research 全文未納入，但實際 v1.0 WP2 specification 已存在；歷史 readme 與 active UI 文案不同。`Weekly_Service_Level` 這個 ID 在非週 grain 雖自動展週，但其他自訂 grain／metric 組合的適用性仍必須讀 status/reason。沒有找到其他應當宣稱已實作的 HTTP API 或語言切換。
+**仍需調查／未驗證：** 未做 browser acceptance；PBIX refresh 未驗證；原 WP2–WP4 research 全文未納入，但實際 v1.0 WP2 specification 已存在；歷史 readme 與 active UI 文案不同。`Weekly_Service_Level` 這個 ID 在非週 grain 雖自動展週，但其他自訂 grain／metric 組合的適用性仍必須讀 status/reason。沒有找到其他應當宣稱已實作的 HTTP API 或語言切換。L10、L11 已於 UI V1.2 修正，如上表所記。
 
 
-額外靜態發現：UI synthetic calibration 的 recipe 位置與 adapter 不一致（L11），尚未執行重現；notebooks/03_control_tower_dashboard.ipynb 為空／非有效 JSON，不可當成可執行能力證據。
+額外靜態發現：notebooks/03_control_tower_dashboard.ipynb 為空／非有效 JSON，不可當成可執行能力證據。先前 L11 設定傳遞問題已於 UI V1.2 重現、修正並驗證。

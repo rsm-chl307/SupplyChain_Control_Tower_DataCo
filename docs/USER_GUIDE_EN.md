@@ -50,7 +50,7 @@ Earlier acceptance preparation used port 8502; it is not a permanent address or 
 
 ## U02 — Language selection
 
-English is the default; Traditional Chinese (zh-TW) presentation passed the Phase 2 browser acceptance at its declared scope (T25/T32). In CSV upload mode, find Language / 語言 inside the planning form, choose English or 繁體中文, then select Apply language and keep form inputs. This transmits pending edits only; it does not validate inputs or execute planning. The sidebar explains this location. In JSON configuration and legacy modes, use the sidebar Language selector.
+Use the single top-right Language selector for English or Traditional Chinese (zh-TW) in every model and view. Selection applies immediately and uses the shared `ui_locale`. Open **User Guide** beside it for the complete in-app bilingual guide and clickable contents. The guide is rendered alongside the app so Planning controls remain mounted; see the UI V1.2 acceptance report for the tested state-preservation scope.
 
 Run/Scenario IDs, technical statuses, original diagnostic details, uploaded content, canonical CSV headers/data and filenames stay unchanged. Metric definitions and technical identifiers remain available under Technical IDs and display definitions. Language persists within the browser session, not across browser restarts. Wide tables may require horizontal scrolling.
 
@@ -67,9 +67,9 @@ The final report records readable CJK rendering in the tested Chromium runtime a
 5. Map canonical fields to source headers under `Column mapping`; select `Source classification`.
 6. Classify every demand Status as Qualified or Excluded. For status-free WEEKLY input, declare it already qualified.
 
-The existing `examples/planning/user_data/` sample is available (demonstration data, not verified fact). Its product headers are sku/title/uom/rank and mapping headers sku/site; map them rather than assuming canonical names. Order-line input needs complete coverage; see troubleshooting for the source_is_complete UI reachability concern.
+The existing `examples/planning/user_data/` sample is available (demonstration data, not verified fact). Its product headers are sku/title/uom/rank and mapping headers sku/site; map them rather than assuming canonical names. ORDER_LINES shows its complete-history assertion independently of status classification.
 
-**Synthetic-capacity UI limitation:** the calibration checkbox exists, but its recipe location differs from the adapter contract (L11). Supply Weekly workload capacity CSV or use top-level capacity_calibration in JSON.
+**Synthetic capacity:** the CSV calibration control now sends the adapter's top-level `capacity_calibration` recipe. It creates demand-calibrated synthetic capacity, not measured plant capacity, and is recorded as an assumption. The capability catalog records this V1.2 wiring correction.
 
 <a id="u04"></a>
 
@@ -280,8 +280,8 @@ Use the troubleshooting table below. Record actions, Run_ID, Scenario and the fu
 | URL cannot open | Confirm the server is running, use its printed URL and a free port; remote environments need port forwarding. |
 | Result tabs missing | Select Sequential workload and provide a valid Published sequential run folder; the view returns early without a loaded run. |
 | BLOCKED / UNKNOWN coverage | Supply explicit demand/credible zero rows for each item/week; order-line edge weeks need complete data; never fillna(0). |
-| ORDER_LINES complete-extract checkbox unavailable | The checkbox follows status_values in an elif and may be unreachable. This is a static concern, not a reproduced defect. Use explicit JSON source_is_complete only if the extract is actually complete. |
-| Synthetic capacity checked but still BLOCKED | UI writes assumptions.capacity_calibration while the adapter reads top-level capacity_calibration; this static interface mismatch was not runtime-reproduced. Provide capacity CSV or use a valid top-level JSON recipe; do not edit published outputs. |
+| ORDER_LINES complete-extract assertion | The assertion is shown separately from status mapping. Select it only when the source extract really covers the stated history; partial extracts remain invalid. |
+| Synthetic capacity readiness | Confirm the explicit capacity calibration recipe and target utilization in the readiness assumptions. The resulting capacity is synthetic, not measured; provide a capacity CSV when measured capacity is required. |
 | Incompatible units/factors/capacity | Check Quantity_Unit, Workload_Unit and Factor_Version; separate quantity units into runs or explicitly convert upstream. |
 | LOST_SALES rejected | Nonzero opening backlog cannot be discarded silently; verify the business policy rather than clearing balances arbitrarily. |
 | Hash/schema/identity error | Check the folder and all 12 artifacts; use the intact run or execute a legitimate new run, never alter manifest hashes to hide differences. |
@@ -314,7 +314,7 @@ All five workflows have current code support, including English/Traditional Chin
 | Required inputs | Four required files, supply/capacity/factors or explicit assumptions, full horizon. |
 | Steps | Upload → map → classify eligibility → set Sunday bounds/policy/scenarios → Validate inputs → resolve BLOCKED → Validate and run planning. |
 | Outputs / related modules | After READY, a unique run, 12 CSVs, manifest and results; F01–F16. |
-| Common mistakes / limitations | Do not treat missing weeks as zero or assumed priority/capacity as fact; LOST_SALES cannot take nonzero opening backlog. UI synthetic-capacity fallback is limited by L11; provide capacity CSV or use JSON. |
+| Common mistakes / limitations | Do not treat missing weeks as zero or assumed priority/capacity as fact; LOST_SALES cannot take nonzero opening backlog. Synthetic capacity is demand-calibrated, not measured plant capacity. The Legacy Run button is disabled when its date-derived output folder already exists. |
 
 ### Workflow B — Analyze existing scenarios
 

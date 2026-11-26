@@ -50,7 +50,7 @@ python -B -m streamlit run dashboard/scenario_planning_app.py
 
 ## U02 — 語言選擇
 
-英文為預設語言；Phase 2 繁體中文（zh-TW）顯示已在宣告範圍內通過瀏覽器驗收（T25/T32）。CSV 上傳模式請在既有規劃表單內找到 Language / 語言，選擇 English 或繁體中文，再按「套用語言並保留表單輸入」。此操作只傳送待送出的表單值，不會驗證輸入或執行規劃；側欄會說明位置。JSON 設定及歷史獨立週模式則使用側欄語言選擇。
+所有模型與頁面都使用右上方單一語言選擇器，選擇 English 或繁體中文（zh-TW）後立即切換，並沿用共用的 `ui_locale`。選擇器旁的**使用說明**會開啟完整雙語指南與可點選目錄。指南與 App 同時 render，使 Planning 控制保持掛載；已測狀態保留範圍見 UI V1.2 驗收報告。
 
 Run／Scenario 識別碼、機器狀態、原始診斷明細、上傳內容、標準 CSV 欄位／資料與檔名保持不變。請在「技術識別碼與顯示定義」檢視指標意義與原始識別碼。語言只保留於目前瀏覽器工作階段，不保證重新開啟瀏覽器後保留。寬表可能需要水平捲動。
 
@@ -67,9 +67,9 @@ Run／Scenario 識別碼、機器狀態、原始診斷明細、上傳內容、�
 5. 在 `Column mapping` 對應 canonical 欄位至實際來源欄；選 `Source classification`。
 6. 逐一將需求 Status 分為 Qualified 或 Excluded；若 WEEKLY 無 Status，勾選已合格需求聲明。
 
-可先用 `examples/planning/user_data/` 的既有樣本（資料為示範，不保證真實）。其 products 欄為 sku/title/uom/rank、mapping 為 sku/site；不要不經 mapping 就假設符合 canonical 名稱。訂單格式需完整 coverage；source_is_complete 控制的 UI 可達性疑點見疑難排解。
+可先用 `examples/planning/user_data/` 的既有樣本（資料為示範，不保證真實）。其 products 欄為 sku/title/uom/rank、mapping 為 sku/site；不要不經 mapping 就假設符合 canonical 名稱。ORDER_LINES 的完整歷史聲明會獨立於狀態分類顯示。
 
-**合成產能 UI 限制：** 校準 checkbox 雖存在，但 recipe 傳遞位置與 adapter 不一致（L11）；目前操作請提供 Weekly workload capacity CSV，或用 JSON 頂層 capacity_calibration。
+**合成產能：** CSV 校準控制現在會依 adapter 契約傳送頂層 `capacity_calibration` recipe。此功能依需求校準合成產能，不是實測工廠產能，並會記錄為假設。Capability Catalog 記錄此 V1.2 接線修正。
 
 <a id="u04"></a>
 
@@ -280,8 +280,8 @@ WP2 N/A 會寫成 N/A；其他 CSV 缺值可為空。UI 語言未來切換也不
 | URL 無法開啟 | 確認 server 仍在執行、使用 terminal URL、埠未占用；遠端環境需 port forwarding。 |
 | 找不到結果頁籤 | 先選 Sequential workload，再提供有效 Published sequential run folder；未載 Run 時會提早返回。 |
 | BLOCKED／UNKNOWN coverage | 提供每個 item 每週明確需求或可信零值；訂單邊界週需完整資料；不要 fillna(0)。 |
-| 無法勾 ORDER_LINES complete extract | 程式 checkbox 在 status_values 後的 elif；可能不可達。此為靜態疑點，尚未定向重現。可使用明確 JSON source_is_complete；不憑空聲明完整。 |
-| 勾合成 capacity 仍 BLOCKED | UI recipe 存在 assumptions.capacity_calibration，adapter 讀頂層 capacity_calibration；此靜態介面差異尚未做執行重現。提供 capacity CSV，或改用合法頂層 JSON recipe；不要改 published outputs。 |
+| ORDER_LINES 完整歷史聲明 | 聲明欄位與狀態對應分開顯示；只有來源確實涵蓋完整期間時才勾選，不完整擷取仍不符合要求。 |
+| 合成產能 readiness | 在 readiness 假設中確認明確校準 recipe 與目標利用率。產能為合成值而非實測值；需要實測產能時請提供產能 CSV。 |
 | 單位／factor／capacity 不相容 | 核對 Quantity_Unit、Workload_Unit、Factor_Version；不同 quantity units 要分 Run 或上游明示轉換。 |
 | LOST_SALES 拒絕執行 | 非零 opening backlog 不可自動丟棄；確認業務政策，不要任意清零。 |
 | hash／schema／identity 錯誤 | 確認目錄正確與 12 artifacts 完整；使用原始完整 Run 或合法重新執行，不修改 manifest hash 掩蓋差異。 |
@@ -314,7 +314,7 @@ WP2 N/A 會寫成 N/A；其他 CSV 缺值可為空。UI 語言未來切換也不
 | 必要輸入 | 四個必要檔、供給／capacity／factor 或明示假設、完整 horizon。 |
 | 步驟 | 上傳→mapping→資格分類→週日／policy／scenarios→Validate inputs→解 BLOCKED→Validate and run planning。 |
 | 輸出／依賴 | READY 後產生唯一 Run、12 CSV、manifest 與 results；F01–F16。 |
-| 常見錯誤／限制 | 不要把缺週當零、把 assumed priority／capacity 當事實；LOST_SALES 不可帶非零 opening backlog。 UI 合成 capacity fallback 有 L11 限制，請提供 capacity CSV 或用 JSON。 |
+| 常見錯誤／限制 | 不要把缺週當零、把 assumed priority／capacity 當事實；LOST_SALES 不可帶非零 opening backlog。合成產能依需求校準，並非實測工廠產能。Legacy 的日期輸出資料夾若已存在，Run 按鈕會停用。 |
 
 ### Workflow B — 分析既有情境
 

@@ -136,7 +136,7 @@ Core engines use DataFrames/pure functions; CSV I/O belongs to adapters, runners
 | F07 | B / Sequential planning execution | Implemented |
 | F08 | B / Initial inventory and opening backlog | Implemented |
 | F09 | B / External receipts and inventory transitions | Implemented |
-| F10 | B / Workload and capacity | Partial / backend implemented, UI calibration wiring incomplete |
+| F10 | B / Workload and capacity | Implemented with limitations / UI calibration wiring verified in UI V1.2 |
 | F11 | B / Constrained workload allocation | Implemented |
 | F12 | B / Backlog policies | Implemented |
 | F13 | C / Scenario generation and execution | Implemented |
@@ -228,7 +228,7 @@ Core engines use DataFrames/pure functions; CSV I/O belongs to adapters, runners
 | Outputs | Sources, Assumptions, Derived_Values, Errors, Warnings, Unavailable_Capabilities. |
 | Business Interpretation | READY means the program contract passed, not external business-data certification. |
 | Dependencies | F02 / F03 |
-| Limitations | Stops on failure rather than reporting every downstream error; no automatic repair. UI synthetic-capacity fallback has a configuration-location mismatch; see L11. |
+| Limitations | Stops on failure rather than reporting every downstream error; no automatic repair. UI synthetic-capacity calibration wiring is verified in V1.2; see L11 for evidence. |
 | Implementation Status | Implemented |
 | Source Reference | [src/csv_planning_inputs.py](../src/csv_planning_inputs.py) — `load_csv_planning_inputs`; [dashboard/scenario_planning_app.py](../dashboard/scenario_planning_app.py) — `_validate_uploaded_config`; [dashboard/scenario_planning_app.py](../dashboard/scenario_planning_app.py) — `_render_readiness_report` |
 
@@ -336,8 +336,8 @@ Core engines use DataFrames/pure functions; CSV I/O belongs to adapters, runners
 | Outputs | workload_factors, capacity_baseline, capacity_pools. |
 | Business Interpretation | Synthetic capacity is not measured capacity; 100% utilization alone is not shortage. |
 | Dependencies | F05 / F06 |
-| Limitations | No plant-specific factors; one compatible factor version/unit. UI puts the recipe under assumptions.capacity_calibration, while the adapter reads top-level capacity_calibration (L11); the no-capacity-CSV UI fallback is not fully operational. Backend JSON calibration is implemented. |
-| Implementation Status | Partial / backend implemented, UI calibration wiring incomplete |
+| Limitations | No plant-specific factors; one compatible factor version/unit. Synthetic capacity is demand-calibrated, not measured plant capacity. Focused UI V1.2 validation confirms the existing UI recipe reaches the adapter through top-level capacity_calibration and the synthetic adapter reaches READY. |
+| Implementation Status | Implemented with limitations; UI recipe wiring verified in UI V1.2 |
 | Source Reference | [src/workload_model.py](../src/workload_model.py) — `calibrate_workload_capacity`; [src/workload_model.py](../src/workload_model.py) — `validate_workload_factors`; [dashboard/scenario_planning_app.py](../dashboard/scenario_planning_app.py) — `_build_upload_config`; [src/csv_planning_inputs.py](../src/csv_planning_inputs.py) — `load_csv_planning_inputs` |
 
 ### F11 — Constrained workload allocation
@@ -899,7 +899,7 @@ All five workflows have current code support and the application-owned English/T
 | Required inputs | Four required files, supply/capacity/factors or explicit assumptions, full horizon. |
 | Steps | Upload → map → classify eligibility → set Sunday bounds/policy/scenarios → Validate inputs → resolve BLOCKED → Validate and run planning. |
 | Outputs / related modules | After READY, a unique run, 12 CSVs, manifest and results; F01–F16. |
-| Common mistakes / limitations | Do not treat missing weeks as zero or assumed priority/capacity as fact; LOST_SALES cannot take nonzero opening backlog. UI synthetic-capacity fallback is limited by L11; provide capacity CSV or use JSON. |
+| Common mistakes / limitations | Do not treat missing weeks as zero or assumed priority/capacity as fact; LOST_SALES cannot take nonzero opening backlog. Synthetic capacity is a demand-calibrated assumption, not measured capacity. |
 
 ### Workflow B — Analyze existing scenarios
 
@@ -1001,8 +1001,8 @@ CSV outputs and configurations are file contracts, not network services. There i
 | L07 | Exports and source retention | Implemented / restricted | CSV/JSON, no XLSX/PDF/ZIP; no automatic source archive; upload originals can be unavailable after temporary cleanup. |
 | L08 | Advanced planning/integration | Not implemented | No forecasting, optimization, cross-plant substitution, BOM, lead time, ERP writeback, business HTTP API, scheduled automation or AI. |
 | L09 | Historical documentation conflicts | Documented / reconcile with code | readme.md still says upload wizard deferred although UI exists; Route B WP numbering differs from later WP1/WP2; historical monitoring KPIs are not Sequential KPIs. |
-| L10 | ORDER_LINES UI completeness | Partial / static concern, targeted verification needed | The completeness checkbox is in an elif after status_values; valid ORDER_LINES normally has Status, so the UI may not expose source_is_complete. JSON supports it; no fix or runtime failure reproduction is claimed here. |
-| L11 | UI synthetic-capacity calibration wiring | Partial / static interface mismatch, runtime reproduction not performed | UI _build_upload_config writes assumptions.capacity_calibration; load_csv_planning_inputs reads top-level config.capacity_calibration. Do not promise the UI fallback without weekly_capacity; provide capacity CSV or an explicit top-level JSON calibration recipe. Backend capability exists; no code is fixed here. |
+| L10 | ORDER_LINES UI completeness | Resolved in UI V1.2 | The complete-extract assertion now renders independently of demand-status classification. The existing `source_is_complete` contract and validation rule are unchanged. Focused AppTest confirms the assertion is visible with status values. |
+| L11 | UI synthetic-capacity calibration wiring | Resolved in UI V1.2 | The existing UI recipe is passed as top-level `capacity_calibration`, as required by `load_csv_planning_inputs`. Synthetic demo adapter validation reaches READY and labels `SYNTHETIC_DEMAND_CALIBRATED`; no engine formula or calibration rule changed. |
 
 <a id="section-12"></a>
 
@@ -1140,7 +1140,7 @@ Only genuine screenshots from the current application may be added. No browser s
 
 [tmp/wp2_acceptance/final_full_suite.log](../tmp/wp2_acceptance/final_full_suite.log); [tmp/wp2_acceptance/final_verification.json](../tmp/wp2_acceptance/final_verification.json); [docs/wp2_implementation_progress.md](../docs/wp2_implementation_progress.md)
 
-**Open investigation/unverified items:** ORDER_LINES completeness-checkbox reachability (L10); browser acceptance not performed; PBIX refresh not verified; original WP2–WP4 research texts are not included, but the actual WP2 v1.0 specification exists; historical readme text differs from the active UI. `Weekly_Service_Level` expands weeks from non-week grains, but applicability of other custom grain/metric combinations still depends on status/reason. No additional implemented HTTP API or language toggle was found.
+**Open investigation/unverified items:** browser acceptance not performed; PBIX refresh not verified; original WP2–WP4 research texts are not included, but the actual WP2 v1.0 specification exists; historical readme text differs from the active UI. `Weekly_Service_Level` expands weeks from non-week grains, but applicability of other custom grain/metric combinations still depends on status/reason. No additional implemented HTTP API or language toggle was found. L10 and L11 were resolved in UI V1.2 as recorded above.
 
 
-Additional static findings: UI synthetic-calibration recipe placement differs from the adapter contract (L11), without runtime reproduction; notebooks/03_control_tower_dashboard.ipynb is empty/non-JSON and is not executable capability evidence.
+Additional static findings: notebooks/03_control_tower_dashboard.ipynb is empty/non-JSON and is not executable capability evidence. The former L11 wiring finding was reproduced, corrected, and validated in UI V1.2.
