@@ -1,0 +1,16 @@
+# Stage 7 formal acceptance audit
+
+Date: 2026-11-26. Source of truth: `STAGE_7_CLOUD_RELEASE_PREPARATION_SPEC.md`, especially work packages 7.1–7.6 and its required tests. Scope is local Cloud release preparation; deployment and paid AI are excluded. Review baseline: `main`/`origin/main` at `a11f98469cbec7ef7d6439f4c8888c38d2773588` before this audit. Python evidence uses `.venv312/bin/python` (3.12.16). No production Secret or real API was used.
+
+| Original criterion | Implementation | Evidence | Result | Open limitation |
+| --- | --- | --- | --- | --- |
+| 7.1 Safe Cloud source boundary, imports, hash manifest | 74-file pinned allowlist and fail-closed builder exist locally | `tests.test_stage7_cloud_release`; two matching Stage 8 candidate manifests | PASS locally | Builder and allowlist were untracked at audit start; verify committed snapshot separately |
+| 7.2 Preserve P5 dispatch lock, tests and local semantics; exclude paid modules | Local `provider.py` has `REAL_PROVIDER_DISPATCH_LOCKED = True`; Cloud package excludes it | Stage 7 lock test passes in working tree; allowlist exclusion test | FAIL as repository acceptance | `HEAD:src/ai_copilot/provider.py` lacks the lock and `execute_authorized`; the required P5 implementation is uncommitted historical work and is outside this publication scope |
+| 7.3 Inspect pins and execute isolated Python 3.12 install/start/tests when available | `.venv312` uses 3.12.16; pinned requirements installed | `pip check`; Stage 8 3.12 package/start and regressions; Stage 7 3.12 suite in this audit | PASS locally | Cloud platform install/runtime remains unexecuted; this is not a Stage 7 deployment condition |
+| 7.4 Packaged Fake/no-key Streamlit runtime, fixtures, Planning and preview | 74-file package starts without key and runs synthetic Planning | Stage 8 packaged probe, 13 output paths, local health HTTP 200; 3.12 Stage 7/AI tests | PASS locally | Public browser and excluded legacy reference data are outside this local package check |
+| 7.5 Secret/data/source safeguards | Builder rejects symlinks, unsafe paths and P5 execution; package contains synthetic data | Stage 7 builder tests; 74-file hash/secret/path inspection | PASS locally | Account-level Cloud Secrets isolation cannot be tested without deployment |
+| 7.6 Fresh reproducible local candidate and regressions | Two 74-file builds match byte-for-byte; tests and `git diff --check` run | Stage 8 candidate manifest SHA `32532c482792680d7df01bac24a36c8d10a76406dabb978a0c8f9797f7596252`; tests logged in Stage 8 report | PASS locally | Candidate source revision includes local changes; remote acceptance needs a reviewed committed snapshot |
+
+The 7.2 failure prevents formal acceptance. The Stage 8 Python 3.12 checks are useful technical evidence but do not override this criterion. The original specification does not define conditional formal acceptance; therefore `PASS WITH LIMITATIONS` in the historical readiness report is not a formal acceptance category.
+
+Files created by this audit: this file and `STAGE_7_FORMAL_ACCEPTANCE_REPORT.md`. The Stage 7 builder and allowlist are reviewed as an independently publishable preparation dependency; no P5/Windows historical file is included. Tests and Git publication results are recorded in the formal report and Stage 8 submission audit.

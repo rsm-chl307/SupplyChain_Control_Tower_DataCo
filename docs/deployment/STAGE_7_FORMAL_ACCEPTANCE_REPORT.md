@@ -1,0 +1,15 @@
+# Stage 7 formal acceptance determination
+
+Date: 2026-11-26. Objective: independently decide Stage 7 against its original specification. Scope: local release preparation, not Cloud deployment or Stage 9. Environment: Debian 13 Dev Container, `.venv312/bin/python` 3.12.16; default Python 3.10.20 preserved.
+
+**NOT ACCEPTED — REMEDIATION REQUIRED.** Criterion 7.2 is not reproducible from committed `main`: the locked P5 provider implementation exists only in the preserved local worktree, while `HEAD:src/ai_copilot/provider.py` does not define `REAL_PROVIDER_DISPATCH_LOCKED` or `execute_authorized`. The 118 historical P5/Windows files remain outside the approved publication scope. This audit does not change that lock or infer acceptance from Stage 8 tests.
+
+The full criterion-by-criterion matrix, evidence and limits are in `STAGE_7_FORMAL_ACCEPTANCE_AUDIT.md`. Remediation: reconcile and independently review the P5 preservation dependency under its own Owner publication decision, then rerun the Stage 7 lock/provider/approval/ledger regressions from a clean committed source and conduct a new formal Stage 7 acceptance review. This decision is not authorization to publish P5 files. Cloud deployment, public browser tests, production Secrets and real AI remain unexecuted.
+
+The Cloud builder and pinned allowlist are local Stage 7 preparation artifacts that can be reviewed and committed separately to support Stage 8 testing; their publication does not grant Stage 7 acceptance. No business rule or architecture was changed. No generated `tmp`, virtual environment, credential or Secret belongs in a commit.
+
+## Verification and record
+
+Commands: `.venv312/bin/python -B -m unittest tests.test_stage7_cloud_release tests.test_cloud_ai_service tests.test_stage4_cloud_ai_ui tests.test_ai_copilot_provider tests.test_ai_copilot_approval tests.test_ai_copilot_ledger tests.test_ai_copilot_execution_gate` — 43 passed, 0 failed, 0 skipped in the local worktree; `.venv312/bin/python -m pip check` — pass; `git diff --check` — pass. See `STAGE_8_TEST_AND_RUNTIME_VERIFICATION_REPORT.md` for the 3.12 package, Planning, UI and isolated-source counts. The local Stage 7 suite is necessary but insufficient because it reads the uncommitted P5 implementation; its test module is therefore not published as a passing clean-source suite.
+
+Files created: this report and `STAGE_7_FORMAL_ACCEPTANCE_AUDIT.md`. Known limitation: actual Cloud deployment/runtime was not authorized. Next step for acceptance is the separate P5 dependency review and a clean-source rerun. Git commit/push results, if any, must be recorded in `STAGE_8_SUBMISSION_AUDIT_REPORT.md` without changing the determination above.
