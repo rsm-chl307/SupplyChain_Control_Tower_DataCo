@@ -1,0 +1,23 @@
+# AI Provider Integration Readiness
+
+Date: 2026-11-27. Scope: offline review and Fake transport validation. Real API calls and Provider unlock are prohibited.
+
+## Routes and request identity
+
+`src/ai_copilot/provider.py` blocks normal real `execute()` and `execute_authorized()` when no mock transport is supplied. Its real branch also explicitly blocks because trusted exact-count dispatch has not been implemented there. The newer P5 Windows path instead prepares a count request, obtains response evidence, constructs a signed Generation Proposal, obtains independent Host Owner Authorization, burns a Ledger claim, issues a signed one-use Permit, and hands off to `HostGenerationExecutor`. This separate path needed its own lock; `REAL_GENERATION_DISPATCH_LOCKED = True` was added before the Host reads credentials.
+
+The Count Runner also exposes a separate real `UrllibTransport`. `REAL_TOKEN_COUNT_DISPATCH_LOCKED = True` now records a failed-before-dispatch state and rejects it before reading a credential. Both locks remain true; neither the manual CLI nor the Worker can issue a real request in this revision. Fake transports retain their offline path.
+
+The Host uses a fixed HTTPS Responses endpoint, no redirect and no environment proxy, a bounded response size and a 180-second timeout. Transport uncertainty consumes the claim and forbids automatic retry. It records request ID, HTTP status, response digest, model, usage if valid, latency and signed raw response. It does **not** obtain a reliable billed charge from the Provider response and records `charge: null`. The Ledger remains held until Owner reconciliation. The actual network schema, model entitlement, server-side token count behavior and live usage have not been proven without a paid call; offline Fake responses cannot establish them.
+
+The [official GPT-6 Luna page](https://developers.openai.com/api/docs/models/gpt-6-luna) lists the model and Responses endpoint. The [token-counting guide](https://developers.openai.com/api/docs/guides/token-counting) says the count API accepts the same input shape as Responses and includes structural tokens that local tokenizers can miss. The [Responses schema](https://developers.openai.com/api/reference/resources/responses/methods/create) exposes `usage` token fields but not a final billed charge. These documentation checks support the chosen endpoints and fail-closed accounting design; they do not prove this account's entitlement or an actual request/response pair.
+
+## Security boundary
+
+The Windows credential is intended to come from Windows Credential Manager at dispatch time; it is not supplied by a report, source file or frontend. Missing credentials fail before transport. Missing count evidence, stale Run identity, changed payload, wrong Owner proof, wrong Permit, duplicate claim and missing result fail closed in the P5 path. Synthetic tests must keep `OPENAI_API_KEY` unset and use Fake transport only. Planning Engine remains the sole source of supply-chain calculations.
+
+This review changed `tools/windows_api_runner/api_runner.py` and `generation_host.py` for the two independent real-transport locks, their matching offline tests, `tools/windows_api_runner/README.md` and `source-manifest.json`. It published the related reviewed P5 source graph as the 69-path commit listed in `P5_EXECUTION_SOURCE_PUBLICATION_REPORT.md`. It did not edit `src/ai_copilot/provider.py` or its true `REAL_PROVIDER_DISPATCH_LOCKED` value. The uncommitted quality policy changes remain outside the publication batch.
+
+## Verification and decision
+
+Python 3.12.16, `pip check`: passed. Focused lock command: `env -u OPENAI_API_KEY .venv312/bin/python -B -m unittest tests.test_windows_api_runner.WindowsApiRunnerTests.test_real_count_transport_is_locked_before_credential_access tests.test_windows_generation_host.HostGenerationTests.test_real_host_transport_is_locked_before_credential_access`: 2 passed, 0 failed, 0 skipped. Both the exact staged snapshot and fresh clean-committed-source archive passed 109 P5/Windows, 78 supplementary P5/Windows and 30 Stage 7/8/security tests; the committed archive also passed Stage 7 49/49 and Stage 8 63/63. Commands and details are in the Source Publication and Local Trial reports. The reviewed source commit `0c90b0a955d5c0ab1ab22b1ac962c56af3d73e97` was pushed and verified at `origin/main`. Native Windows and real API compatibility: NOT EXECUTED. **Real Provider dispatch remains blocked.** Future authorization must cover current pricing, exact payload, budget, credentials and a separately reviewed unlock; this report is not that authorization.
