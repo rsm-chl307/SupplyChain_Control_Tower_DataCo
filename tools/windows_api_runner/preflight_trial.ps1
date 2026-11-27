@@ -8,13 +8,15 @@ $out = Join-Path $env:TEMP "supplychain-trial-preflight-$stamp.txt"
 $version = & $Python -3.12 -c "import sys; print(sys.version); print(sys.executable)" 2>&1
 if ($LASTEXITCODE -ne 0) { throw "Python 3.12 preflight failed" }
 $git = git rev-parse HEAD
+if ($LASTEXITCODE -ne 0) { throw "Git commit preflight failed" }
 $status = git status --short
+if ($LASTEXITCODE -ne 0) { throw "Git worktree preflight failed" }
 $budget = Join-Path $env:LOCALAPPDATA "SupplyChainCopilot/trial_budget.sqlite3"
 $budgetState = if (Test-Path $budget) { "PRESENT (contents not displayed)" } else { "MISSING; real dispatch must remain blocked" }
 $sqlite = & $Python -3.12 -c "import sqlite3; print('SQLite:', sqlite3.sqlite_version); print('Thread safety:', sqlite3.threadsafety)" 2>&1
 if ($LASTEXITCODE -ne 0) { throw "SQLite preflight failed" }
 $integrity = if (Test-Path $budget) {
-    $result = & $Python -3.12 -c "import sqlite3,sys; c=sqlite3.connect('file:'+sys.argv[1]+'?mode=ro',uri=True); result=c.execute('PRAGMA integrity_check').fetchone()[0]; print('Trial DB integrity:',result); c.close(); sys.exit(0 if result=='ok' else 1)" $budget 2>&1
+    $result = & $Python -3.12 -c "import sqlite3,sys,pathlib; c=sqlite3.connect(pathlib.Path(sys.argv[1]).as_uri()+'?mode=ro',uri=True); result=c.execute('PRAGMA integrity_check').fetchone()[0]; print('Trial DB integrity:',result); c.close(); sys.exit(0 if result=='ok' else 1)" $budget 2>&1
     if ($LASTEXITCODE -ne 0) { throw "Trial DB integrity preflight failed" }
     $result
 } else { "SKIPPED (no budget DB)" }

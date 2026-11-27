@@ -12,7 +12,7 @@
     },
     {
       "path": "api_runner.py",
-      "sha256": "8769c749794f5002ba91151396d76cbe5525c9715bce2c491fe7966ef475a36d"
+      "sha256": "f946ce0d5f13a8ef957d217a9fd3307bafbe2d1200cc322aaa25abe54158dc1e"
     },
     {
       "path": "auto_run_policy.py",
@@ -52,7 +52,7 @@
     },
     {
       "path": "generation_host.py",
-      "sha256": "0c882551be45548d6a571075c5bde0bc6aa353880c4448102dd22b582fd97ff4"
+      "sha256": "bd98a4a5e90fb1f89a814c4c6f2ac1b2b372863e6067c36bb51a77f28d8e1b99"
     },
     {
       "path": "generation_key_setup.py",
@@ -68,7 +68,7 @@
     },
     {
       "path": "preflight_trial.ps1",
-      "sha256": "c0757a24e16f16ca68d19ee465fbdfa834a5cc6cc89e34747f3700cede9ed560"
+      "sha256": "11d1e04ac75c235bca2c7b137022076e06b854502a269a24e62b15d9c236eb99"
     },
     {
       "path": "request-package.schema.json",
@@ -100,7 +100,7 @@
     },
     {
       "path": "trial_budget.py",
-      "sha256": "8294da61db3238ba1af70e21e173a112824c833e0599e5c1ecb194ed1874415a"
+      "sha256": "4387759751eb3812e342662f847060652c357e71b23ef816b949f97ea9e5bc0e"
     },
     {
       "path": "verify_credential.py",

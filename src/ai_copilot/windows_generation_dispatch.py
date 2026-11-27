@@ -122,7 +122,7 @@ def prepare_generation_proposal(*, namespace: EvaluationNamespace,
         "count_payload_sha256": count_digest,
         "count_projection_sha256": count_projection,
         "count_evidence_sha256": _evidence_sha256(token_evidence),
-        "count_request_id": token_evidence.request_id,
+        "count_request_id": token_evidence.runner_request_id or token_evidence.request_id,
         "input_tokens": token_evidence.input_tokens, "token_cap": request.max_input_tokens,
         "provider_request_digest": request.request_digest,
         "brief_digest": request.brief_digest,
@@ -194,7 +194,8 @@ def finalize_generation_dispatch(*, prepared: PreparedGenerationProposal,
             or body["count_evidence_sha256"] != _evidence_sha256(token_evidence)
             or body["count_payload_sha256"] != count_digest
             or body["count_projection_sha256"] != count_projection
-            or body["count_request_id"] != token_evidence.request_id
+            or body["count_request_id"] != (
+                token_evidence.runner_request_id or token_evidence.request_id)
             or body["input_tokens"] != token_evidence.input_tokens
             or body["approval_reference"] != reservation["approval_reference"]
             or body["paid_authorization_reference"] != paid_auth_ref

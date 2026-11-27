@@ -11,6 +11,9 @@ from tools.windows_api_runner.generation_host import (
 )
 from tools.windows_api_runner.generation_owner import HostOwnerPasswordGate, OwnerPasswordVerifier
 from tools.windows_api_runner.generation_permit import HostGenerationPermitState
+from tools.windows_api_runner.trial_budget import (
+    BudgetReservation, PRICE_VERSION, TrialBudgetController,
+)
 from src.ai_copilot.windows_generation_dispatch import (
     collect_generation_response, finalize_generation_dispatch,
 )
@@ -89,6 +92,44 @@ class HostGenerationTests(unittest.TestCase):
                           side_effect=AssertionError("network")):
             with self.assertRaisesRegex(RunnerError, "separate Owner authorization"):
                 executor.dispatch(b"invalid package")
+        self.assertEqual(self.credentials.calls, 0)
+
+    def test_ev01_owner_authorization_reserves_shared_budget_without_network(self):
+        body = json.loads(self.prepared.proposal_path.read_bytes())["body"]
+        budget = TrialBudgetController.provision(
+            self.fixture.root / "ev01-trial.sqlite3", "ev01-offline",
+            price_version=PRICE_VERSION)
+        budget.enable(FakeVerifierStore().load(), "synthetic-owner-password-long")
+        count = BudgetReservation(
+            request_id=body["count_request_id"], operation="input_token_count",
+            campaign_id="p5-local-trial-count", case_id="EV-01",
+            run_id=body["run_id"], model=body["model"],
+            payload_sha256=body["count_payload_sha256"],
+            estimated_micro=20_000, reserved_micro=20_000,
+            price_version=PRICE_VERSION)
+        budget.reserve(count)
+        budget.claim(count.request_id, count.operation, count.payload_sha256,
+                     campaign_id=count.campaign_id, case_id=count.case_id,
+                     run_id=count.run_id, model=count.model)
+        budget.confirm_count(count.request_id, input_tokens=body["input_tokens"],
+                             latency_ms=1)
+        executor = HostGenerationExecutor(
+            issuer_public_key=self.issuer.public_key(),
+            signing_key=self.fixture.host_private,
+            owner_gate=HostOwnerPasswordGate(FakeVerifierStore()),
+            state=HostGenerationPermitState(self.fixture.root / "ev01-host-state.sqlite3"),
+            credential_store=self.credentials,
+            transport=FixedGenerationTransport(), exchange=self.host_exchange,
+            trial_budget=budget)
+        with patch.object(FixedGenerationTransport, "post",
+                          side_effect=AssertionError("network")) as post:
+            executor.authorize(self.prepared.proposal_path.read_bytes(),
+                               prompt=lambda _: "synthetic-owner-password-long",
+                               display=lambda _: None)
+            with self.assertRaisesRegex(RunnerError, "separate Owner authorization"):
+                executor.dispatch(b"invalid package")
+        post.assert_not_called()
+        self.assertEqual(budget.snapshot()["reserved_micro"], 40_000)
         self.assertEqual(self.credentials.calls, 0)
 
     def test_one_password_proof_and_one_fake_dispatch(self):

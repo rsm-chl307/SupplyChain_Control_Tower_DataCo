@@ -1,0 +1,60 @@
+# EV-01 — Owner Authorization Preflight
+
+Date: 2026-11-27 UTC. Baseline: fetched `origin/main` and local `HEAD` were both `c52ee0f7e6da56bbd3bf09a15787027c0c1f99ad` before changes. Environment: Linux Dev Container, `.venv312/bin/python` 3.12.16. Scope: EV-01 synthetic local trial preparation only. No API credential was read, no real Count or Generation request was sent, no dispatch lock was changed, and no Cloud deployment was performed.
+
+## Decision and safety boundary
+
+**Pending final clean-source validation and native Windows evidence.** The Owner accepts a limited nonzero chance of exceeding the US$1 target; an absolute provider billing guarantee is therefore not an acceptance criterion. This does not waive the US$1 *combined Count + Generation local reservation target*, the US$0.20 buffer, one request at a time, one EV-01 Count and one EV-01 Generation, or fail-closed behavior on unknown outcomes. The local ledger is not the provider invoice. No EV-02 request is permitted before separate billing reconciliation and a new Owner decision.
+
+`REAL_PROVIDER_DISPATCH_LOCKED`, `REAL_TOKEN_COUNT_DISPATCH_LOCKED`, and `REAL_GENERATION_DISPATCH_LOCKED` remain `True` in committed-source design. The ordinary Provider route has an additional unconditional real-dispatch block. The fixed Windows Count and Generation routes require signed/validated P5 artifacts, a shared local budget claim before credential access, and their own explicit lock change in a later separately authorized step. Environment variables and configuration files do not turn these constants off. A person who can edit executable source or the Host database is outside the configuration threat boundary; Windows file permissions and deployment hashes must be checked natively.
+
+## Budget and EV-01 binding
+
+The Host uses `%LOCALAPPDATA%\SupplyChainCopilot\trial_budget.sqlite3` for both real fixed transports. No missing database is auto-created on dispatch. It is disabled when provisioned, and enabling requires the existing Owner password verifier. SQLite `BEGIN IMMEDIATE` serializes reservations and claims across processes using that one file. Request UUID, case, Run ID, model, campaign, payload digest, Count Runner UUID, Count payload digest, estimate, reserve, known actual, usage and latency are separate fields. Duplicate or concurrent claims fail; a crash after claim, timeout, uncertain response, missing budget, mismatched identity or missing credential cannot trigger automatic retry.
+
+Only EV-01 is admissible. The first reservation must be one Count. A Generation reservation requires that same Count to be durably confirmed, with the same Run ID, model and Count payload digest, and no other request present. The Generation proposal uses the Windows Runner's Count UUID for new Runs; the historical provider-request-ID fallback remains only for older synthetic records, which cannot satisfy this new EV-01 Host budget link. The P5 signed proposal, Owner proof, one-use permit, Approval, Execution Gate, Ledger and Archive continue to bind the Generation payload and Count evidence. Count evidence expires after 24 hours and changed payloads fail validation.
+
+For an HTTP 200 Count, the Runner requires the documented `response.input_tokens` object, an integer count no greater than 25,000, a provider request ID, and durable response-package persistence before marking the Count `COUNT_CONFIRMED`. This state retains the full US$0.02 reserve and leaves actual cost unknown; it allows only the linked EV-01 Generation. Any failed or uncertain Count holds the Trial. The Generation Host stores validated usage separately from actual charge; after any real Generation response it holds the Trial pending Owner billing reconciliation. An Owner-authenticated later actual-cost entry never silently releases that hold. An actual Count charge greater than its reserve holds the Trial before Generation.
+
+The fixed policy is US$1 nominal combined target, US$0.20 buffer, at most US$0.80 locally reservable, and US$0.02 per Count or Generation request. Before a network call, the matching reservation must fit the remaining allowance. The first Count and Generation together reserve US$0.04. Actual cost can exceed estimate or reserve; this is an accepted *finite* risk, not a guaranteed spending cap. If the local budget database is copied, lost, reset, or separately provisioned on another Host, this guarantee no longer spans Hosts. Use one Windows Host and one budget file for EV-01; do not switch Host mid-trial.
+
+## Model, schema and cost estimate
+
+The pinned model is `gpt-6-luna`; the P5 request caps input and output at 25,000 tokens each, uses medium reasoning, JSON schema output, disabled truncation, and a 180-second Generation timeout. The Count payload is derived from the same validated Generation request and omits only fields the Count endpoint does not accept. The fixed Count endpoint is `/v1/responses/input_tokens`; the Generation endpoint is `/v1/responses`. The Host does not automatically retry either. OpenAI's official [Luna model page](https://developers.openai.com/api/docs/models/gpt-6-luna) currently lists Standard text rates of US$0.10/1M input and US$0.50/1M output tokens; regional processing adds 10%, while Fast mode can double the applicable rates. The [Count reference](https://developers.openai.com/api/reference/resources/responses/subresources/input_tokens/methods/count) documents `input_tokens` but not an authoritative final charge. The [Responses schema](https://developers.openai.com/api/reference/resources/responses/methods/create) permits `usage: null`.
+
+The local versioned Generation estimate uses those Standard rates plus a 10% regional margin: `ceil((0.11 × exact_input_tokens + 0.55 × 25,000) micro-USD)`. For a provisional EV-01 Count of 4,000 input tokens, this is **US$0.014190**; at the full 25,000 input cap it is **US$0.016500**. Both retain a US$0.02 reserve. The Count fee is not established by the response schema, so its displayed estimate is a conservative **US$0.02 proxy/reserve**, not a provider quote. The combined provisional estimate proxy is US$0.034190; combined reservation is US$0.04. Historical EV-01 counts do not authorize a new Run: replace 4,000 with the actual new Count before Generation approval. Fast tier, price changes, account-specific terms, unexpected charge categories, Count billing and delayed reporting can cause actual cost to exceed these estimates. Owner must confirm the account's model entitlement, intended Standard tier and current price before authorizing any paid call.
+
+## Minimal EV-01 execution sequence — future separate authorization only
+
+1. Generate one fresh synthetic EV-01 Run and validated Brief/ProviderRequest; record Run ID, request digest, model, 25,000-token caps and approved scenario. Do not use a historical Count.
+2. On the **same Windows Host**, with a provisioned and Owner-enabled single Trial database after separate authorization, execute one Count request. Before transport, the Host reserves US$0.02 and burns a matching one-use claim. If Count fails, times out, lacks a valid response, or the file cannot be persisted, stop without a replacement UUID.
+3. Reconcile the Count response into P5 evidence. Verify Runner UUID, provider request ID, Run ID, full payload digest, model, count projection, token cap, 24-hour freshness and reserved balance. If any item differs, stop.
+4. Prepare one signed EV-01 Generation proposal. The Host Owner password step reserves US$0.02 only when the matching Count is confirmed. The Container's Approval, paid authorization, Archive intent, Ledger claim and signed permit must all match the same proposal and payload. A failed budget reservation must not issue an authorization file.
+5. Only after a **new explicit Owner instruction** to unlock the precise EV-01 real paths, execute one Generation. Capture provider request ID, returned model, HTTP status, validated usage, latency, signed response, P5 Ledger and Archive. Never retry an uncertain request.
+6. Owner reviews project usage/billing and records actual Count and Generation charges separately from estimates and reserves. Keep the Trial held; do not start EV-02 until that review and a separate decision.
+
+Stop conditions: missing/changed Count evidence, changed payload, non-EV-01 case, wrong Run/model, expired proof, missing Approval or permit, budget claim failure, unknown Count/Generation outcome, missing usage, charge over reserve, source/hash mismatch, missing Host protection, or Owner denial. No automatic retry or parallel request is allowed.
+
+## Windows and account checks requiring Owner action
+
+From a **native Windows PowerShell** in a clean copy of the verified GitHub main repository, before supplying any credential:
+
+```powershell
+git fetch origin main
+git rev-parse HEAD
+git rev-parse origin/main
+powershell -NoProfile -File tools/windows_api_runner/preflight_trial.ps1
+py -3.12 -m unittest -q tests.test_trial_budget tests.test_windows_api_runner tests.test_windows_generation_host tests.test_windows_generation_authorization tests.test_windows_generation_permit tests.test_windows_generation_ledger tests.test_windows_runner_deployment
+```
+
+Expected: HEAD and `origin/main` match the verified SHA below; Python 3.12 is available; Count and Generation lock values are `True`; SQLite integrity is `ok` if a Trial DB exists (otherwise the script reports missing and real dispatch remains blocked); all offline tests pass. The script writes a timestamped report under `%TEMP%` without reading credential values. Review private path names before sharing it. Native Credential Manager access, Windows ACLs, SQLite locking/backup and the Windows/Container exchange are **not verified** by this Linux Dev Container. If execution policy prevents the script, resolve that on Windows without globally lowering security settings.
+
+Separately, Owner should sign in to the intended OpenAI Platform project and confirm the `gpt-6-luna` entitlement, intended processing tier, current price, billing visibility, remaining project balance and any project limits. This is an account observation, not API authorization. After a later explicit authorization, the API Key must be entered only through the existing hidden Windows Credential Manager provisioning flow; it must not be pasted into chat, commands, environment variables, Git, logs or the Container. Do not provision or read it during this preflight.
+
+## Validation evidence, changes and Git status
+
+Focused offline budget and manifest command: `env -u OPENAI_API_KEY .venv312/bin/python -B -m unittest -q tests.test_trial_budget tests.test_windows_runner_deployment tests.test_wp3_generation_deployment` — 20 passed, 0 failed, 0 skipped in the worktree. The synthetic fixed-transport authorization test reserves the linked EV-01 Generation without network or credential access and confirms the real dispatch lock still rejects it. Full P5/Stage 7/Stage 8 clean-source verification and final commit/push evidence follow below after completion; no test collection is counted as a pass.
+
+Files inspected: Stage 7/8 and Phase 2 reports, Count Runner, Generation Host, signed proposal/permit, P5 Count reconciliation, Provider, Approval/Ledger, Windows deploy manifest and tests. Files changed in this preflight: `tools/windows_api_runner/trial_budget.py`, `tools/windows_api_runner/api_runner.py`, `tools/windows_api_runner/generation_host.py`, `tools/windows_api_runner/preflight_trial.ps1`, `tools/windows_api_runner/source-manifest.json`, `src/ai_copilot/windows_generation_dispatch.py`, `tests/test_trial_budget.py`, `tests/test_windows_generation_host.py`, `tests/test_windows_generation_ledger.py`, and this report. No unrelated historical file, Secret, virtual environment or temporary output is staged.
+
+Final local/remote SHA, clean-source test counts and publication result: pending verification.

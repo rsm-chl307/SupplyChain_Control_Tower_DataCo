@@ -170,6 +170,26 @@ class HostGenerationExecutor:
         self.owner_gate.consume(bound, summary)
         proof = sign_owner_authorization(new_authorization_body(_proposal_scope(body)),
                                          self.signing_key)
+        if isinstance(self.transport, FixedGenerationTransport):
+            try:
+                from tools.windows_api_runner.trial_budget import (
+                    BudgetReservation, GENERATION_LIMIT_MICRO, PRICE_VERSION,
+                    estimate_generation_micro, windows_trial_budget,
+                )
+                budget = self.trial_budget or windows_trial_budget()
+                budget.reserve(BudgetReservation(
+                    request_id=body["request_id"], operation="responses_generation",
+                    campaign_id=body["campaign_id"], case_id=body["case_id"],
+                    run_id=body["run_id"], model=body["model"],
+                    payload_sha256=body["payload_sha256"],
+                    count_request_id=body["count_request_id"],
+                    count_payload_sha256=body["count_payload_sha256"],
+                    estimated_micro=estimate_generation_micro(
+                        body["input_tokens"], body["payload"].get("max_output_tokens")),
+                    reserved_micro=GENERATION_LIMIT_MICRO,
+                    price_version=PRICE_VERSION))
+            except Exception:
+                raise RunnerError("EV-01 Trial budget unavailable; authorization was not issued") from None
         _write_once(self.exchange / "generation" / "authorizations" /
                     f"{body['request_id']}.json", proof)
         return proof
@@ -214,6 +234,7 @@ class HostGenerationExecutor:
                 budget = self.trial_budget or windows_trial_budget()
                 budget.claim(body["request_id"], "responses_generation",
                              body["payload_sha256"], campaign_id=body["campaign_id"],
+                             case_id=body["case_id"], run_id=body["run_id"],
                              model=body["model"],
                              cost_limit_micro=body["cost_limit_micro_usd"])
             except Exception:
@@ -302,6 +323,12 @@ class HostGenerationExecutor:
         except Exception:
             self.state.transition(permit.permit_sha256, "IN_PROGRESS", "UNKNOWN")
             raise RunnerError("Generation response persistence failed; outcome UNKNOWN") from None
+        if budget is not None and usage is not None:
+            try:
+                budget.record_usage(body["request_id"], usage)
+            except Exception:
+                self.state.transition(permit.permit_sha256, "IN_PROGRESS", "UNKNOWN")
+                raise RunnerError("Generation usage accounting uncertain; no retry") from None
         self.state.transition(permit.permit_sha256, "IN_PROGRESS",
                               "SUCCEEDED" if 200 <= result.status < 300 else "FAILED_AFTER_DISPATCH")
         return record

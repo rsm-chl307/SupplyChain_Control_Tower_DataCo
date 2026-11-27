@@ -212,6 +212,7 @@ class HostClaimTests(unittest.TestCase):
         permit_raw = canonical_json_bytes(package["permit"])
         verified = verify_signed_permit(permit_raw, issuer.public_key())
         self.assertEqual(verified.body["request_id"], prepared.request_id)
+        self.assertEqual(verified.body["count_request_id"], self.count.runner_request_id)
         self.assertEqual(verified.body["proposal_sha256"], prepared.proposal_sha256)
         self.assertEqual(verified.body["host_authorization_sha256"],
                          hashlib.sha256(proof).hexdigest())

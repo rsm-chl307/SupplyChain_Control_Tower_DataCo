@@ -408,10 +408,22 @@ class ApiRunner:
         budget = None
         if isinstance(self.transport, UrllibTransport):
             try:
-                from tools.windows_api_runner.trial_budget import windows_trial_budget
+                from tools.windows_api_runner.trial_budget import (
+                    BudgetReservation, GENERATION_LIMIT_MICRO, PRICE_VERSION,
+                    windows_trial_budget,
+                )
                 budget = self.trial_budget or windows_trial_budget()
+                budget.reserve(BudgetReservation(
+                    request_id=package["request_id"], operation=package["operation"],
+                    campaign_id="p5-local-trial-count", case_id=package["case_id"],
+                    run_id=package["run_id"], model=package["model"],
+                    payload_sha256=request.payload_digest,
+                    estimated_micro=GENERATION_LIMIT_MICRO,
+                    reserved_micro=GENERATION_LIMIT_MICRO,
+                    price_version=PRICE_VERSION))
                 budget.claim(package["request_id"], package["operation"],
                              request.payload_digest, campaign_id="p5-local-trial-count",
+                             case_id=package["case_id"], run_id=package["run_id"],
                              model=package["model"])
             except Exception:
                 self.state_store.transition(package["request_id"], "RECEIVED",
@@ -457,12 +469,6 @@ class ApiRunner:
             "usage": None, "response_body": _response_body(result.body, api_key),
             "executed_at": datetime.now(timezone.utc).isoformat(),
         }
-        if budget is not None:
-            # Input-token Count does not return authoritative billed cost.
-            # Keep the shared trial held until independent Owner reconciliation.
-            budget.finish(package["request_id"], actual_micro=None,
-                          usage_json=None, billing_source=None,
-                          latency_ms=int((time.monotonic() - started) * 1000))
         for field in P5_REQUEST_FIELDS:
             if field in package:
                 response[field] = package[field]
@@ -472,6 +478,14 @@ class ApiRunner:
         if isinstance(body, dict):
             response["returned_model_id"] = _sanitize(body.get("model"), api_key) if body.get("model") else None
             response["usage"] = _sanitize(body.get("usage"), api_key) if body.get("usage") is not None else None
+        confirmed_count = (final_state == "SUCCEEDED" and isinstance(body, dict)
+                           and body.get("object") == "response.input_tokens"
+                           and type(body.get("input_tokens")) is int
+                           and 0 <= body["input_tokens"] <= 25_000
+                           and isinstance(response["openai_request_id"], str)
+                           and bool(response["openai_request_id"]))
+        if budget is not None and not confirmed_count:
+            response["runner_execution_status"] = final_state = "UNKNOWN"
         response_dir = Path(response_dir)
         response_path = response_dir / f"{package['request_id']}.json"
         temp_path = response_path.with_suffix(".json.tmp")
@@ -495,6 +509,21 @@ class ApiRunner:
                                         http_status=result.status,
                                         safe_error="Response package persistence failed after dispatch")
             raise RunnerError("Response persistence failed after dispatch; do not resubmit") from None
+
+        if budget is not None:
+            try:
+                if confirmed_count:
+                    budget.confirm_count(package["request_id"],
+                                         input_tokens=body["input_tokens"],
+                                         latency_ms=int((time.monotonic() - started) * 1000))
+                else:
+                    budget.finish(package["request_id"], actual_micro=None,
+                                  usage_json=None, billing_source=None,
+                                  latency_ms=int((time.monotonic() - started) * 1000))
+            except Exception:
+                self.state_store.transition(package["request_id"], "IN_PROGRESS", "UNKNOWN",
+                                            safe_error="Trial accounting uncertain")
+                raise RunnerError("Trial accounting uncertain; do not resubmit") from None
 
         self.state_store.transition(package["request_id"], "IN_PROGRESS", final_state,
                                     http_status=result.status, response_path=str(response_path))

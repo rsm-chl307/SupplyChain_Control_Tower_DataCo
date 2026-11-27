@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from contextlib import closing
 from dataclasses import dataclass
+import json
 import os
 from pathlib import Path
 import re
@@ -21,6 +22,8 @@ from typing import Protocol
 TRIAL_LIMIT_MICRO = 1_000_000
 SAFETY_BUFFER_MICRO = 200_000
 GENERATION_LIMIT_MICRO = 20_000
+PRICE_VERSION = "gpt-6-luna-standard-2026-11-27"
+TRIAL_CASE_ID = "EV-01"
 OPERATIONS = frozenset({"input_token_count", "responses_generation"})
 _DIGEST = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -43,6 +46,10 @@ class BudgetReservation:
     estimated_micro: int
     reserved_micro: int
     price_version: str
+    case_id: str
+    run_id: str
+    count_request_id: str | None = None
+    count_payload_sha256: str | None = None
 
     def validate(self) -> None:
         try:
@@ -59,8 +66,29 @@ class BudgetReservation:
                 or type(self.estimated_micro) is not int
                 or type(self.reserved_micro) is not int
                 or not 0 < self.estimated_micro <= self.reserved_micro
-                or self.reserved_micro != GENERATION_LIMIT_MICRO):
+                or self.reserved_micro != GENERATION_LIMIT_MICRO
+                or self.case_id != TRIAL_CASE_ID
+                or not isinstance(self.run_id, str) or not 1 <= len(self.run_id) <= 128
+                or (self.operation == "input_token_count" and (
+                    self.count_request_id is not None or self.count_payload_sha256 is not None))
+                or (self.operation == "responses_generation" and (
+                    not isinstance(self.count_request_id, str)
+                    or not isinstance(self.count_payload_sha256, str)
+                    or _DIGEST.fullmatch(self.count_payload_sha256) is None))):
             raise TrialBudgetBlocked("Trial reservation identity or price basis is invalid")
+        if self.count_request_id is not None:
+            try:
+                uuid.UUID(self.count_request_id)
+            except (ValueError, TypeError, AttributeError) as exc:
+                raise TrialBudgetBlocked("Count request identity is invalid") from exc
+
+
+def estimate_generation_micro(input_tokens: int, output_cap: int) -> int:
+    """Standard Luna text estimate with 10% regional margin; not final billing."""
+    if (type(input_tokens) is not int or type(output_cap) is not int
+            or not 0 <= input_tokens <= 25_000 or output_cap != 25_000):
+        raise TrialBudgetBlocked("Generation token caps are invalid")
+    return (11 * input_tokens + 55 * output_cap + 99) // 100
 
 
 class TrialBudgetController:
@@ -90,7 +118,7 @@ class TrialBudgetController:
         target = Path(path)
         if (not target.is_absolute() or target.is_symlink() or not target.parent.is_dir()
                 or not isinstance(trial_id, str) or not 1 <= len(trial_id) <= 100
-                or not isinstance(price_version, str) or not 1 <= len(price_version) <= 100):
+                or price_version != PRICE_VERSION):
             raise TrialBudgetBlocked("Trial budget provisioning inputs are invalid")
         try:
             fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -105,7 +133,9 @@ class TrialBudgetController:
                     limit_micro INTEGER NOT NULL, buffer_micro INTEGER NOT NULL)""")
                 db.execute("""CREATE TABLE requests (
                     request_id TEXT PRIMARY KEY, operation TEXT NOT NULL,
-                    campaign_id TEXT NOT NULL, model TEXT NOT NULL,
+                    campaign_id TEXT NOT NULL, case_id TEXT NOT NULL,
+                    run_id TEXT NOT NULL, count_request_id TEXT,
+                    count_payload_sha256 TEXT, model TEXT NOT NULL,
                     payload_sha256 TEXT NOT NULL, estimated_micro INTEGER NOT NULL,
                     reserved_micro INTEGER NOT NULL, price_version TEXT NOT NULL,
                     state TEXT NOT NULL, actual_micro INTEGER, usage_json TEXT,
@@ -166,34 +196,61 @@ class TrialBudgetController:
                 if db.execute("SELECT 1 FROM requests WHERE request_id=?",
                               (item.request_id,)).fetchone():
                     raise TrialBudgetBlocked("Request identity was already used")
+                prior = db.execute("SELECT request_id,operation,case_id,run_id,model,"
+                                   "payload_sha256,state,usage_json FROM requests ORDER BY created_at,request_id"
+                                   ).fetchall()
+                if item.operation == "input_token_count":
+                    if prior:
+                        raise TrialBudgetBlocked("Only one EV-01 Count is allowed")
+                elif (len(prior) != 1 or prior[0][1:7] != (
+                        "input_token_count", item.case_id, item.run_id, item.model,
+                        item.count_payload_sha256, "COUNT_CONFIRMED")
+                        or prior[0][0] != item.count_request_id):
+                    raise TrialBudgetBlocked("EV-01 Generation needs the same confirmed Count")
+                if item.operation == "responses_generation":
+                    try:
+                        counted = json.loads(prior[0][7])
+                        if (type(counted) is not dict
+                                or item.estimated_micro != estimate_generation_micro(
+                                    counted["input_tokens"], 25_000)):
+                            raise ValueError
+                    except (ValueError, TypeError, KeyError):
+                        raise TrialBudgetBlocked("Generation estimate differs from confirmed Count") from None
                 spent = db.execute("SELECT COALESCE(SUM(reserved_micro),0) FROM requests").fetchone()[0]
                 if spent + item.reserved_micro > row[4] - row[5]:
                     raise TrialBudgetBlocked("Combined Count and Generation budget exhausted")
                 now = int(time.time())
-                db.execute("INSERT INTO requests VALUES (?,?,?,?,?,?,?,?,?,NULL,NULL,NULL,NULL,?,?)",
+                db.execute("""INSERT INTO requests (
+                    request_id,operation,campaign_id,case_id,run_id,count_request_id,
+                    count_payload_sha256,model,payload_sha256,estimated_micro,
+                    reserved_micro,price_version,state,created_at,updated_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                            (item.request_id, item.operation, item.campaign_id,
-                            item.model, item.payload_sha256, item.estimated_micro,
-                            item.reserved_micro, item.price_version, "RESERVED", now, now))
+                            item.case_id, item.run_id, item.count_request_id,
+                            item.count_payload_sha256, item.model, item.payload_sha256,
+                            item.estimated_micro, item.reserved_micro,
+                            item.price_version, "RESERVED", now, now))
                 db.commit()
             except (sqlite3.Error, TrialBudgetBlocked):
                 db.rollback()
                 raise
 
     def claim(self, request_id: str, operation: str, payload_sha256: str,
-              *, campaign_id: str, model: str,
+              *, campaign_id: str, case_id: str, run_id: str, model: str,
               cost_limit_micro: int | None = None) -> None:
         """Burn one matching claim before credential access or transport."""
         with closing(self._connect()) as db:
             try:
                 db.execute("BEGIN IMMEDIATE")
                 trial = self._check(db)
-                item = db.execute("SELECT operation,campaign_id,model,payload_sha256,"
+                item = db.execute("SELECT operation,campaign_id,case_id,run_id,model,payload_sha256,"
                                   "reserved_micro,state FROM requests WHERE request_id=?",
                                   (request_id,)).fetchone()
                 if (not trial[2] or trial[3] or item is None
-                        or item[:4] != (operation, campaign_id, model, payload_sha256)
-                        or (cost_limit_micro is not None and item[4] != cost_limit_micro)
-                        or item[5] != "RESERVED"
+                        or item[:6] != (operation, campaign_id, case_id, run_id,
+                                        model, payload_sha256)
+                        or (cost_limit_micro is not None and item[6] != cost_limit_micro)
+                        or item[7] != "RESERVED"
                         or db.execute("SELECT 1 FROM requests WHERE state IN ('CLAIMED','UNKNOWN') "
                                       "LIMIT 1").fetchone()):
                     raise TrialBudgetBlocked("Trial claim missing, mismatched or held")
@@ -230,6 +287,79 @@ class TrialBudgetController:
                             billing_source if valid else None,
                             latency_ms, int(time.time()), request_id))
                 if state == "UNKNOWN":
+                    db.execute("UPDATE trial SET held=1 WHERE id=1")
+                db.commit()
+            except (sqlite3.Error, TrialBudgetBlocked):
+                db.rollback()
+                raise
+
+    def confirm_count(self, request_id: str, *, input_tokens: int,
+                      latency_ms: int) -> None:
+        """Successful persisted Count keeps its full reserve pending billing.
+
+        This is not an actual-cost settlement. It permits only the linked
+        EV-01 Generation; any uncertain Count still holds the trial.
+        """
+        if (type(input_tokens) is not int or not 0 <= input_tokens <= 25_000
+                or type(latency_ms) is not int or latency_ms < 0):
+            raise TrialBudgetBlocked("Confirmed Count result is invalid")
+        with closing(self._connect()) as db:
+            try:
+                db.execute("BEGIN IMMEDIATE")
+                self._check(db)
+                row = db.execute("SELECT operation,state FROM requests WHERE request_id=?",
+                                 (request_id,)).fetchone()
+                if row != ("input_token_count", "CLAIMED"):
+                    raise TrialBudgetBlocked("Only a claimed Count can be confirmed")
+                db.execute("UPDATE requests SET state='COUNT_CONFIRMED',usage_json=?,"
+                           "latency_ms=?,updated_at=? WHERE request_id=?",
+                           (json.dumps({"input_tokens": input_tokens}), latency_ms,
+                            int(time.time()), request_id))
+                db.commit()
+            except (sqlite3.Error, TrialBudgetBlocked):
+                db.rollback()
+                raise
+
+    def record_usage(self, request_id: str, usage: dict) -> None:
+        """Store only the three numeric provider usage fields, never payload text."""
+        if (type(usage) is not dict or set(usage) != {
+                "input_tokens", "output_tokens", "total_tokens"}
+                or any(type(value) is not int or value < 0 for value in usage.values())
+                or usage["input_tokens"] + usage["output_tokens"] != usage["total_tokens"]):
+            raise TrialBudgetBlocked("Provider usage is invalid")
+        with closing(self._connect()) as db:
+            try:
+                db.execute("BEGIN IMMEDIATE")
+                row = db.execute("SELECT operation,state FROM requests WHERE request_id=?",
+                                 (request_id,)).fetchone()
+                if row != ("responses_generation", "UNKNOWN"):
+                    raise TrialBudgetBlocked("Only an uncertain Generation can record usage")
+                db.execute("UPDATE requests SET usage_json=?,updated_at=? WHERE request_id=?",
+                           (json.dumps(usage, sort_keys=True), int(time.time()), request_id))
+                db.commit()
+            except (sqlite3.Error, TrialBudgetBlocked):
+                db.rollback()
+                raise
+
+    def record_actual(self, request_id: str, *, actual_micro: int,
+                      billing_source: str, verifier: OwnerAuthenticator,
+                      password: str) -> None:
+        """Owner records later billing evidence without clearing the trial hold."""
+        if (type(actual_micro) is not int or actual_micro < 0
+                or billing_source != "owner-verified-platform-billing"
+                or not verifier.authenticate(password)):
+            raise TrialBudgetBlocked("Owner billing reconciliation is invalid")
+        with closing(self._connect()) as db:
+            try:
+                db.execute("BEGIN IMMEDIATE")
+                row = db.execute("SELECT state,actual_micro,reserved_micro FROM requests WHERE request_id=?",
+                                 (request_id,)).fetchone()
+                if row is None or row[0] not in ("COUNT_CONFIRMED", "UNKNOWN") or row[1] is not None:
+                    raise TrialBudgetBlocked("Billing may be recorded only once for this request")
+                db.execute("UPDATE requests SET actual_micro=?,billing_source=?,updated_at=? "
+                           "WHERE request_id=?",
+                           (actual_micro, billing_source, int(time.time()), request_id))
+                if actual_micro > row[2]:
                     db.execute("UPDATE trial SET held=1 WHERE id=1")
                 db.commit()
             except (sqlite3.Error, TrialBudgetBlocked):
