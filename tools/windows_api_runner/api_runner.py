@@ -18,6 +18,7 @@ from pathlib import Path
 import re
 import sqlite3
 import sys
+import time
 import urllib.error
 import urllib.request
 import uuid
@@ -378,10 +379,11 @@ class ExecutionStateStore:
 
 class ApiRunner:
     def __init__(self, credential_store: CredentialStore, transport: Transport,
-                 state_store: ExecutionStateStore):
+                 state_store: ExecutionStateStore, trial_budget=None):
         self.credential_store = credential_store
         self.transport = transport
         self.state_store = state_store
+        self.trial_budget = trial_budget
 
     def execute(self, request: ValidatedRequest, response_dir: str | Path,
                 *, confirm: bool, already_received: bool = False) -> dict:
@@ -403,6 +405,19 @@ class ApiRunner:
             self.state_store.transition(package["request_id"], "RECEIVED", "FAILED_BEFORE_DISPATCH",
                                         safe_error="Manual confirmation was not provided")
             raise RunnerError("Manual confirmation required; request was not dispatched")
+        budget = None
+        if isinstance(self.transport, UrllibTransport):
+            try:
+                from tools.windows_api_runner.trial_budget import windows_trial_budget
+                budget = self.trial_budget or windows_trial_budget()
+                budget.claim(package["request_id"], package["operation"],
+                             request.payload_digest, campaign_id="p5-local-trial-count",
+                             model=package["model"])
+            except Exception:
+                self.state_store.transition(package["request_id"], "RECEIVED",
+                                            "FAILED_BEFORE_DISPATCH",
+                                            safe_error="Trial budget unavailable")
+                raise RunnerError("Trial budget unavailable; count was not dispatched") from None
         try:
             api_key = self.credential_store.get_api_key()
             if (not isinstance(api_key, str) or not api_key or not api_key.isascii()
@@ -411,6 +426,9 @@ class ApiRunner:
             if api_key.encode("ascii") in canonical_json_bytes(package):
                 raise RunnerError("Credential-like content is forbidden in request packages")
         except Exception as exc:
+            if budget is not None:
+                budget.finish(package["request_id"], actual_micro=None,
+                              usage_json=None, billing_source=None)
             self.state_store.transition(package["request_id"], "RECEIVED", "FAILED_BEFORE_DISPATCH",
                                         safe_error="Credential unavailable")
             if isinstance(exc, RunnerError):
@@ -418,9 +436,14 @@ class ApiRunner:
             raise RunnerError("Credential unavailable") from None
 
         self.state_store.transition(package["request_id"], "RECEIVED", "IN_PROGRESS")
+        started = time.monotonic()
         try:
             result = self.transport.post(request.payload_bytes, api_key)
         except Exception:
+            if budget is not None:
+                budget.finish(package["request_id"], actual_micro=None,
+                              usage_json=None, billing_source=None,
+                              latency_ms=int((time.monotonic() - started) * 1000))
             self.state_store.transition(package["request_id"], "IN_PROGRESS", "UNKNOWN",
                                         safe_error="Transport outcome uncertain")
             raise RunnerError("Outcome UNKNOWN; do not resubmit this request") from None
@@ -434,6 +457,12 @@ class ApiRunner:
             "usage": None, "response_body": _response_body(result.body, api_key),
             "executed_at": datetime.now(timezone.utc).isoformat(),
         }
+        if budget is not None:
+            # Input-token Count does not return authoritative billed cost.
+            # Keep the shared trial held until independent Owner reconciliation.
+            budget.finish(package["request_id"], actual_micro=None,
+                          usage_json=None, billing_source=None,
+                          latency_ms=int((time.monotonic() - started) * 1000))
         for field in P5_REQUEST_FIELDS:
             if field in package:
                 response[field] = package[field]

@@ -137,7 +137,7 @@ class HostGenerationExecutor:
     def __init__(self, *, issuer_public_key: Ed25519PublicKey,
                  signing_key: Ed25519PrivateKey, owner_gate: HostOwnerPasswordGate,
                  state: HostGenerationPermitState, credential_store,
-                 transport, exchange: Path):
+                 transport, exchange: Path, trial_budget=None):
         if issuer_public_key.public_bytes_raw() == signing_key.public_key().public_bytes_raw():
             raise RunnerError("Host and P5 issuer signing keys must differ")
         self.issuer_public_key = issuer_public_key
@@ -147,6 +147,7 @@ class HostGenerationExecutor:
         self.credential_store = credential_store
         self.transport = transport
         self.exchange = Path(exchange)
+        self.trial_budget = trial_budget
 
     def authorize(self, proposal_raw: bytes, *, prompt=None, display=print) -> bytes:
         proposal = verify_signed_proposal(proposal_raw, self.issuer_public_key)
@@ -206,13 +207,31 @@ class HostGenerationExecutor:
                 or body["host_authorization_sha256"] != proof.envelope_sha256):
             raise RunnerError("Generation permit, proposal or Owner proof identity differs")
         self.state.claim(permit)
+        budget = None
+        if isinstance(self.transport, FixedGenerationTransport):
+            try:
+                from tools.windows_api_runner.trial_budget import windows_trial_budget
+                budget = self.trial_budget or windows_trial_budget()
+                budget.claim(body["request_id"], "responses_generation",
+                             body["payload_sha256"], campaign_id=body["campaign_id"],
+                             model=body["model"],
+                             cost_limit_micro=body["cost_limit_micro_usd"])
+            except Exception:
+                self.state.transition(permit.permit_sha256, "CLAIMED", "FAILED_BEFORE_DISPATCH")
+                raise RunnerError("Trial budget unavailable; Generation was not dispatched") from None
         try:
             key = self.credential_store.get_api_key()
         except Exception:
+            if budget is not None:
+                budget.finish(body["request_id"], actual_micro=None,
+                              usage_json=None, billing_source=None)
             self.state.transition(permit.permit_sha256, "CLAIMED", "FAILED_BEFORE_DISPATCH")
             raise RunnerError("Generation credential is unavailable") from None
         if (type(key) is not str or not key or key != key.strip()
                 or any(ord(char) < 33 or ord(char) == 127 for char in key)):
+            if budget is not None:
+                budget.finish(body["request_id"], actual_micro=None,
+                              usage_json=None, billing_source=None)
             key = None
             self.state.transition(permit.permit_sha256, "CLAIMED", "FAILED_BEFORE_DISPATCH")
             raise RunnerError("Generation credential is invalid")
@@ -221,10 +240,20 @@ class HostGenerationExecutor:
         try:
             result = self.transport.post(canonical_json_bytes(proposal.body["payload"]), key)
         except Exception:
+            if budget is not None:
+                budget.finish(body["request_id"], actual_micro=None,
+                              usage_json=None, billing_source=None,
+                              latency_ms=int((time.monotonic() - started) * 1000))
             self.state.transition(permit.permit_sha256, "IN_PROGRESS", "UNKNOWN")
             raise RunnerError("Generation dispatch outcome is UNKNOWN; no retry") from None
         finally:
             key = None
+        if budget is not None:
+            # Responses usage is not an authoritative final charge. The Host
+            # keeps the request held until a separate trusted reconciliation.
+            budget.finish(body["request_id"], actual_micro=None,
+                          usage_json=None, billing_source=None,
+                          latency_ms=int((time.monotonic() - started) * 1000))
         if (type(result) is not HttpResult or type(result.status) is not int
                 or not 100 <= result.status <= 599 or type(result.body) is not bytes
                 or len(result.body) > MAX_RESPONSE_BYTES):

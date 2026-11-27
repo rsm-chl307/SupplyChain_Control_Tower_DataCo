@@ -12,7 +12,7 @@
     },
     {
       "path": "api_runner.py",
-      "sha256": "c996ea02792c99a59b45de5badbe82da2f373902a14e7d4da62b28df6a3e1a55"
+      "sha256": "8769c749794f5002ba91151396d76cbe5525c9715bce2c491fe7966ef475a36d"
     },
     {
       "path": "auto_run_policy.py",
@@ -32,7 +32,7 @@
     },
     {
       "path": "deploy_generation.ps1",
-      "sha256": "e1e470d79e16de591bd944d0da176b23ca921cdf63af7b2b78fcb241dbd2aa29"
+      "sha256": "37f43eba343043fd61e48bcdcb45ad3a2a94f1a35972ba1bea55428e710d77f9"
     },
     {
       "path": "disable_auto_run.ps1",
@@ -52,7 +52,7 @@
     },
     {
       "path": "generation_host.py",
-      "sha256": "b7058c04ff6c84440a314a78d55b44d6d0666f3ace67bd209c4514446d0aaadb"
+      "sha256": "0c882551be45548d6a571075c5bde0bc6aa353880c4448102dd22b582fd97ff4"
     },
     {
       "path": "generation_key_setup.py",
@@ -65,6 +65,10 @@
     {
       "path": "generation_permit.py",
       "sha256": "a99f4d6ea595ea80507ac5d43dfa9a2cffda29d3e28b349ec3af1442dcba9a19"
+    },
+    {
+      "path": "preflight_trial.ps1",
+      "sha256": "c0757a24e16f16ca68d19ee465fbdfa834a5cc6cc89e34747f3700cede9ed560"
     },
     {
       "path": "request-package.schema.json",
@@ -93,6 +97,10 @@
     {
       "path": "store_credential.py",
       "sha256": "4d1d8301c02f43ec81efd82cbad6e194e47502425649d17cc03aa188fd2a9167"
+    },
+    {
+      "path": "trial_budget.py",
+      "sha256": "8294da61db3238ba1af70e21e173a112824c833e0599e5c1ecb194ed1874415a"
     },
     {
       "path": "verify_credential.py",

@@ -1,5 +1,6 @@
 """Reviewed exact input-token evidence for a single P5 Responses payload."""
 from dataclasses import dataclass
+from datetime import datetime, timezone, timedelta
 import hashlib
 import json
 import re
@@ -212,6 +213,14 @@ def require_exact_token_count(case_id: str, request: ProviderRequest, *,
                 and evidence.evidence_source != "WINDOWS_HOST_RUNNER")):
         raise CampaignBlocked("Exact input-token evidence missing, stale or invalid")
     if evidence.evidence_source == "WINDOWS_HOST_RUNNER":
+        try:
+            counted_at = datetime.fromisoformat(evidence.timestamp_utc or "")
+            now = datetime.now(timezone.utc)
+            if (counted_at.tzinfo is None or counted_at > now + timedelta(minutes=5)
+                    or now - counted_at > timedelta(hours=24)):
+                raise ValueError
+        except ValueError as exc:
+            raise CampaignBlocked("Runner token evidence expired or has invalid time") from exc
         if review is None:
             raise CampaignBlocked("Runner token evidence requires its validated Brief")
         if evidence.runner_request_id is None:

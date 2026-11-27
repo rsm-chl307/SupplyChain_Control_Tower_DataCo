@@ -37,7 +37,7 @@ if (Test-Path -LiteralPath $policyPath) {
 
 $generationFiles = @('external_issuer.py','generation_authorization.py','generation_host.py',
     'generation_key_setup.py','generation_owner.py','generation_permit.py',
-    'requirements-generation.txt','deploy_generation.ps1')
+    'trial_budget.py','requirements-generation.txt','deploy_generation.ps1')
 $job = [guid]::NewGuid().ToString('N')
 $stage = Join-Path $env:TEMP "P5GenerationStage_$job"
 $backup = Join-Path $env:LOCALAPPDATA "SupplyChainCopilot\backups\generation_$job"

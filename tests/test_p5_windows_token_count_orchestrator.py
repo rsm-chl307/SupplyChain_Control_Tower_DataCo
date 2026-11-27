@@ -1,5 +1,5 @@
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import json
 import os
 from pathlib import Path
@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from src.ai_brief.workflow import prepare_brief
 from src.ai_copilot.provider import build_request
+from src.ai_copilot.eight_call_campaign import CampaignBlocked
 from src.ai_copilot.windows_runner_exchange import (
     EXCHANGE_PATH_ENV, RunnerExchangeBlocked, prepare_configured_count_request,
 )
@@ -180,6 +181,11 @@ class P5TokenCountOrchestratorTests(unittest.TestCase):
         from src.ai_copilot.token_count_evidence import require_exact_token_count
         self.assertEqual(require_exact_token_count(
             "EV-01", self.request, evidence=evidence, review=self.review), 3200)
+        stale = replace(evidence, timestamp_utc=(datetime.now(timezone.utc)
+                        - timedelta(days=2)).isoformat())
+        with self.assertRaises(CampaignBlocked):
+            require_exact_token_count("EV-01", self.request,
+                                      evidence=stale, review=self.review)
         with self.assertRaises(TokenCountWorkflowBlocked):
             self.workflow.collect_response(prepared.request_id, "EV-01",
                                            self.review, self.request)
