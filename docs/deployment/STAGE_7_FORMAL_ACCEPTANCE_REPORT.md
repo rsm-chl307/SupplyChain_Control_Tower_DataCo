@@ -1,5 +1,7 @@
 # Stage 7 formal acceptance determination
 
+**2026-11-27 current status: ACCEPTED for the original local Cloud release-preparation scope (7.1–7.6).** The clean-source P5 lock and Provider tests now pass on Python 3.12.16 after commits `fda19bbfa7bb054b8590f347338e0eab043d1487` and `71fab3e707850e3e5067f8aa0f83185253423eaf`. See `STAGE_7_REMEDIATION_REPORT.md` for the new matrix, 49/49 security, 63/63 Stage 8/Cloud and 119/119 Planning clean-source evidence. The earlier NOT ACCEPTED decision below is retained as the 2026-11-26 historical finding. Paid AI activation and Cloud deployment remain separate and unaccepted.
+
 Date: 2026-11-26. Objective: independently decide Stage 7 against its original specification. Scope: local release preparation, not Cloud deployment or Stage 9. Environment: Debian 13 Dev Container, `.venv312/bin/python` 3.12.16; default Python 3.10.20 preserved.
 
 **NOT ACCEPTED — REMEDIATION REQUIRED.** Criterion 7.2 is not reproducible from committed `main`: the locked P5 provider implementation exists only in the preserved local worktree, while `HEAD:src/ai_copilot/provider.py` does not define `REAL_PROVIDER_DISPATCH_LOCKED` or `execute_authorized`. The 118 historical P5/Windows files remain outside the approved publication scope. This audit does not change that lock or infer acceptance from Stage 8 tests.

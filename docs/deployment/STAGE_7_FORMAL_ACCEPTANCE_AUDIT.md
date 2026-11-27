@@ -1,5 +1,7 @@
 # Stage 7 formal acceptance audit
 
+**2026-11-27 update:** this table records the original failed baseline. The P5 lock and tests were later repaired in committed source; the current 7.1–7.6 acceptance matrix and evidence are in `STAGE_7_REMEDIATION_REPORT.md`. Do not read the historical 7.2 failure below as the current Stage 7 conclusion.
+
 Date: 2026-11-26. Source of truth: `STAGE_7_CLOUD_RELEASE_PREPARATION_SPEC.md`, especially work packages 7.1–7.6 and its required tests. Scope is local Cloud release preparation; deployment and paid AI are excluded. Review baseline: `main`/`origin/main` at `a11f98469cbec7ef7d6439f4c8888c38d2773588` before this audit. Python evidence uses `.venv312/bin/python` (3.12.16). No production Secret or real API was used.
 
 | Original criterion | Implementation | Evidence | Result | Open limitation |
