@@ -1,0 +1,2 @@
+# Local test-only dependency; excluded from the Cloud runtime allowlist.
+markdown-it-py==4.0.0

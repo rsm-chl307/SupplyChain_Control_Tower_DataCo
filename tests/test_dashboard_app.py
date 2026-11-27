@@ -73,7 +73,9 @@ class InvestigationAppTests(unittest.TestCase):
         import json
         from src.run_planning import run_csv_planning
 
-        cls.temporary = tempfile.TemporaryDirectory()
+        allowed_root = ROOT / "tmp/planning_source_runs"
+        allowed_root.mkdir(parents=True, exist_ok=True)
+        cls.temporary = tempfile.TemporaryDirectory(dir=allowed_root)
         cls.addClassCleanup(cls.temporary.cleanup)
         cls.runs = {}
         for mode in ["synthetic_demo", "user_data"]:

@@ -65,7 +65,9 @@ with patch("src.comparison_io.load_comparison_input", side_effect=ValueError("Se
 class ComparisonDashboardTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.temp = tempfile.TemporaryDirectory()
+        allowed_root = ROOT / 'tmp/planning_source_runs'
+        allowed_root.mkdir(parents=True, exist_ok=True)
+        cls.temp = tempfile.TemporaryDirectory(dir=allowed_root)
         cls.addClassCleanup(cls.temp.cleanup)
         cls.runs = {}
         for mode in ['synthetic_demo', 'user_data']:
@@ -160,7 +162,7 @@ class ComparisonDashboardTests(unittest.TestCase):
         self.assertEqual(app.multiselect(key='wp2_priorities').value, [])
 
     def test_invalid_run_is_rejected_without_comparison(self):
-        with tempfile.TemporaryDirectory() as temp:
+        with tempfile.TemporaryDirectory(dir=ROOT/'tmp/planning_source_runs') as temp:
             manifest = json.loads((self.runs['synthetic_demo']/'run_manifest.json').read_text())
             manifest['Publication_Status']='UNPUBLISHED'
             (Path(temp)/'run_manifest.json').write_text(json.dumps(manifest))

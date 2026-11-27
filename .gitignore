@@ -8,6 +8,7 @@ __pycache__/
 
 # Local virtual environments
 .venv/
+.venv312/
 venv/
 
 # Playwright conventional output directories
