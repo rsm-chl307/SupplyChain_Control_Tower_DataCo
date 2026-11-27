@@ -1,8 +1,8 @@
-"""Phase 1 R1–R3 focused reliability tests; no planning or publication.
+"""Phase 1 R1–R3 focused reliability tests using a disposable published Run.
 
-Fixtures are disposable, invalid copies of the approved existing input. They
-never invoke a planning runner or mutate an existing Run. The Run-switch AppTest
-is a selector-only fixture and is not Published Run browser E2E evidence.
+Setup builds one Run from tracked synthetic inputs before installing runner
+guards. Test cases never plan or mutate that Run. The Run-switch AppTest is a
+selector-only fixture and is not Published Run browser E2E evidence.
 """
 from __future__ import annotations
 
@@ -24,15 +24,25 @@ from pandas.testing import assert_frame_equal
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
-PRIMARY = REPO / 'tmp/user_data_acceptance_2026-11-17/runs/sequential_20261117T133913_e22d0f430e98'
 EVIDENCE = Path(os.environ.get('PHASE1_EVIDENCE_ROOT', str(
     REPO / 'tmp/phase_1_reliability/20261119T034337Z_f91753')))
 _GUARDS = []
 _RUNNER_MOCKS = []
+_SOURCE_RUN = None
+PRIMARY = None
 
 
 def setUpModule():
-    """Guard before importing the dashboard or comparison loader."""
+    """Create a tracked-input fixture, then forbid planning in all test cases."""
+    global PRIMARY, _SOURCE_RUN
+    from src.run_planning import run_csv_planning
+    source = REPO / 'examples/planning/user_data'
+    config = json.loads((source / 'config.json').read_text())
+    fixture_root = EVIDENCE / 'fixtures'
+    fixture_root.mkdir(parents=True, exist_ok=True)
+    _SOURCE_RUN = tempfile.TemporaryDirectory(prefix='phase1-source-', dir=fixture_root)
+    outputs = run_csv_planning(config, inputs_dir=source, output_root=_SOURCE_RUN.name)
+    PRIMARY = outputs['run_manifest'].parent
     for name in ['run_csv_planning', 'run_sequential_planning']:
         guard = patch('src.run_planning.' + name,
                       side_effect=AssertionError('Phase 1 risk tests must not execute planning'))
@@ -44,6 +54,8 @@ def tearDownModule():
     for guard in reversed(_GUARDS):
         guard.stop()
     _GUARDS.clear()
+    if _SOURCE_RUN is not None:
+        _SOURCE_RUN.cleanup()
 
 
 class ManifestShapeTests(unittest.TestCase):
@@ -59,6 +71,8 @@ class ManifestShapeTests(unittest.TestCase):
         self.folder = Path(self.temporary.name)
         for record in self.manifest['Artifacts'].values():
             shutil.copyfile(PRIMARY / record['Path'], self.folder / record['Path'])
+        self.expected_allocation_rows = len(pd.read_csv(
+            self.folder / self.manifest['Artifacts']['allocation_result']['Path']))
 
     def assert_rejected(self, manifest, field):
         (self.folder / 'run_manifest.json').write_text(json.dumps(manifest))
@@ -71,7 +85,7 @@ class ManifestShapeTests(unittest.TestCase):
     def test_valid_existing_manifest_still_loads(self):
         (self.folder / 'run_manifest.json').write_text(json.dumps(self.manifest))
         actual = self.load(self.folder, include_evidence=True)
-        self.assertEqual(len(actual['allocation']), 60)
+        self.assertEqual(len(actual['allocation']), self.expected_allocation_rows)
         self.assertEqual(set(actual['allocation'].Run_ID), {self.manifest['Run_ID']})
 
     def test_null_root_is_controlled_rejection(self):
