@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P5 Input Token Count Response Package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id", "case_id", "run_id", "payload_digest", "operation", "http_status", "openai_request_id", "model", "returned_model_id", "usage", "response_body", "executed_at", "runner_execution_status"],
+  "properties": {
+    "request_id": {"type": "string", "format": "uuid"},
+    "case_id": {"type": "string"},
+    "run_id": {"type": "string"},
+    "payload_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "operation": {"const": "input_token_count"},
+    "http_status": {"type": ["integer", "null"], "minimum": 100, "maximum": 599},
+    "openai_request_id": {"type": ["string", "null"]},
+    "model": {"const": "gpt-6-luna"},
+    "returned_model_id": {"type": ["string", "null"]},
+    "usage": {"type": ["object", "null"]},
+    "response_body": {},
+    "executed_at": {"type": "string", "format": "date-time"},
+    "runner_execution_status": {"enum": ["SUCCEEDED", "FAILED_AFTER_DISPATCH", "FAILED_BEFORE_DISPATCH", "UNKNOWN"]},
+    "runner_error": {"type": "string", "maxLength": 500},
+    "brief_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "provider_request_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "count_projection_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "run_manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

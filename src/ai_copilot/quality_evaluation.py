@@ -132,7 +132,8 @@ def assess_technical(case: dict, *, dataset_version: str, campaign_id: str,
     _text(campaign_id, "campaign_id")
     rebuilt = build_request(review, model_snapshot=request.model_snapshot,
                             max_output_tokens=request.max_output_tokens,
-                            timeout_seconds=request.timeout_seconds)
+                            timeout_seconds=request.timeout_seconds,
+                            execution_profile=request.execution_profile)
     verify_request(request)
     if rebuilt != request:
         raise EvaluationBlocked("Brief or request provenance changed")

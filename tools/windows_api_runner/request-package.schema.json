@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P5 Input Token Count Request Package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id", "case_id", "run_id", "operation", "model", "payload", "payload_digest", "created_at"],
+  "properties": {
+    "request_id": {"type": "string", "format": "uuid"},
+    "case_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "run_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "operation": {"const": "input_token_count"},
+    "model": {"const": "gpt-6-luna"},
+    "payload": {"type": "object", "required": ["model"], "properties": {"model": {"const": "gpt-6-luna"}}, "additionalProperties": true},
+    "payload_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "brief_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "provider_request_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "count_projection_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "run_manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "enabled": false,
+  "allowed_operations": ["input_token_count"],
+  "allowed_models": ["gpt-6-luna"],
+  "allowed_case_ids": [],
+  "max_requests_per_utc_day": 1,
+  "max_request_bytes": 1048576,
+  "max_payload_bytes": 786432
+}

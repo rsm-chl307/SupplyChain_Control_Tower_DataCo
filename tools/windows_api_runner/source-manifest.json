@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "deployment_script_sha256": "6e8d844e6c12469d4f16738b55d4da30ff90453039bb0264eb2d17d2d53af8dd",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "8d499df09459319c914dbcd6ce026ebf71430d00d238214642c19a8534b41f46"
+    },
+    {
+      "path": "__init__.py",
+      "sha256": "06971387a53c42049d11734338cf23c375c0e02004416a98020f1160ce2dbad5"
+    },
+    {
+      "path": "api_runner.py",
+      "sha256": "c996ea02792c99a59b45de5badbe82da2f373902a14e7d4da62b28df6a3e1a55"
+    },
+    {
+      "path": "auto_run_policy.py",
+      "sha256": "6fd471d3f44227c9df8c486037e37a2463b3b084f5efc89f40ad87f277309bde"
+    },
+    {
+      "path": "auto_run_policy.template.json",
+      "sha256": "4dfd9d27cc99b70b43edf4ba85d4587d52accef964c828dc1d7735b5428ec010"
+    },
+    {
+      "path": "backup_runner_state.py",
+      "sha256": "e1c8bcda37a01698f2cd190f55758726f24717086e94112c738498579feafb48"
+    },
+    {
+      "path": "bootstrap_worker.ps1",
+      "sha256": "e76a856e81487eb5155bc8c59a50ad027ae611455c60f70a59738384c5c9d8fe"
+    },
+    {
+      "path": "deploy_generation.ps1",
+      "sha256": "e1e470d79e16de591bd944d0da176b23ca921cdf63af7b2b78fcb241dbd2aa29"
+    },
+    {
+      "path": "disable_auto_run.ps1",
+      "sha256": "11c040281289e3ff36d5f7172ccd8291ac2e189b5d5751129cd2826bc39c68a6"
+    },
+    {
+      "path": "enable_auto_run.ps1",
+      "sha256": "4f0c2c28991b3ba8839a548607f74a603e911ea3b3b035a5645e02c64ac94680"
+    },
+    {
+      "path": "external_issuer.py",
+      "sha256": "4b16a0e8ad311ce42bb33ead73ccf0f728abc97c93226290ec1c820b8e30c4f2"
+    },
+    {
+      "path": "generation_authorization.py",
+      "sha256": "bb6cb36d97e3b8488b1d5808ff0131fda8f6241cf0ee9e62e9a2345f5de32dbe"
+    },
+    {
+      "path": "generation_host.py",
+      "sha256": "b7058c04ff6c84440a314a78d55b44d6d0666f3ace67bd209c4514446d0aaadb"
+    },
+    {
+      "path": "generation_key_setup.py",
+      "sha256": "f079698450fa4696adf033ef5703931a39961689532ccfb1c245044416df3ce1"
+    },
+    {
+      "path": "generation_owner.py",
+      "sha256": "b68c379418266c44eda4b551710ff1b62ce86337e6aa10746f4bce5a8452018a"
+    },
+    {
+      "path": "generation_permit.py",
+      "sha256": "a99f4d6ea595ea80507ac5d43dfa9a2cffda29d3e28b349ec3af1442dcba9a19"
+    },
+    {
+      "path": "request-package.schema.json",
+      "sha256": "83a10139cbf1ce3fe81e2090087064220efdb2256df0a1400154477dc89fa53f"
+    },
+    {
+      "path": "requirements-generation.txt",
+      "sha256": "f6d052154d39f9e9c8590108e950e5a93db39e428a0a533fcacbc4d337302f74"
+    },
+    {
+      "path": "response-package.schema.json",
+      "sha256": "fea52ba9caef8cf89010d1aee00cc5ae566a32bcb7fc3f045d3e9815e675e53e"
+    },
+    {
+      "path": "start_worker.ps1",
+      "sha256": "0552038f2e2d66b3dec2431d6d6d35a6392ec10c88d26a6b207c55426588b0fd"
+    },
+    {
+      "path": "status_worker.ps1",
+      "sha256": "a7a17b82eff290d66dda3be411ad62893c48f800309842f1eab3f3591c864478"
+    },
+    {
+      "path": "stop_worker.ps1",
+      "sha256": "894137cbf567ce1caf610a91e60346aee5aeea192bdf4f60d29bb2947229c714"
+    },
+    {
+      "path": "store_credential.py",
+      "sha256": "4d1d8301c02f43ec81efd82cbad6e194e47502425649d17cc03aa188fd2a9167"
+    },
+    {
+      "path": "verify_credential.py",
+      "sha256": "a0284b90798223b80af3f313b5659df4f0e2626cf1c57777ea339e4979ceea88"
+    },
+    {
+      "path": "worker.py",
+      "sha256": "a0378111763c6696483b3c856dd09ededf39a26bcfcde5ad8bca2ef2c8e3c459"
+    },
+    {
+      "path": "worker_task.ps1",
+      "sha256": "3b5d8ef8d159e438b7e181c90c0c4ac03371fc87c0477dc5364beac455d04018"
+    }
+  ]
+}
